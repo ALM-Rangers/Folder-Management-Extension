@@ -1,9 +1,9 @@
 # VSO Extension - Folder Management
 
-## What
+### What
 Easily and quickly create new folders in Code Explorer through the Web Access for TFVC and Git.
 
-## Why
+### Why
 Previously you could only create new files from web access. To add a folder, you would need to use your local Git or TFVC repository. This meant that people who aren’t comfortable using Git or Visual Studio, could not add a folder. This extension helps solve that problem.
 
 ![](https://github.com/ALM-Rangers/VSO-Extension-FolderManagement/blob/master/media/FolderManagementExtension.PNG)
