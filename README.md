@@ -11,7 +11,7 @@ Previously you could only create new files from web access. To add a folder, you
 2. Browse to the folder of the extension
 3. Publish the contents of the extension to a local or cloud web server
 4. The root of the extension should be at the root of the web server, for example: https://myserver/images/fabrikam-logo.png
-5. Update this extension manifest file. To do this, update the  namespace field to a globally unique value. For example: johnsmith.samples.foldermanagement. Also, update the  baseUri  field to be the fully qualified URL to the root of your web server, for example:  https://myserver 
+5. Update the extension manifest file (extension.json). To do this, update the  namespace field to a globally unique value. For example: johnsmith.samples.foldermanagement. Also, update the  baseUri  field to be the fully qualified URL to the root of your web server, for example:  https://myserver 
 8. Install the extension into your Visual Studio Online account
 9. Navigate to  https://youraccount.visualstudio.com/_admin/_ext  (replace your account with your real account name)
 10. Click Install and browse to your manifest file, for example extension.json
