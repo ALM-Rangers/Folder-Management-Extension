@@ -24,7 +24,6 @@
   <ItemGroup>
     <Content Include="css\dialog.css" />
     <Content Include="dialog.html" />
-    <Content Include="images\fabrikam-logo.png" />
     <Content Include="images\show-properties.png" />
     <Content Include="images\VSO_Folder_16x.png" />
     <Content Include="images\VSO_Folder_196x.png" />
@@ -51,7 +50,6 @@
   <ItemGroup>
     <Content Include="extension.json" />
     <Content Include="vwd.webinfo" />
-    <Content Include="Readme.md" />
     <Content Include="extension.me.json" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
