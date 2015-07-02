@@ -1,0 +1,49 @@
+﻿/*---------------------------------------------------------------------
+ <copyright file="dialog.css">
+    This code is licensed under the MIT License.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
+    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
+    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+    PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ </copyright>
+ <summary>Styling for the dialog.</summary>
+---------------------------------------------------------------------*/
+
+body {
+    min-height: 153px;
+}
+
+.folder-directory {
+    display: grid;
+    -ms-grid-columns: auto auto auto;
+    -ms-grid-rows: auto;
+}
+
+.description {
+    -ms-grid-column: 1;
+    float: left;
+    padding-right: 5px;
+}
+
+.directory {
+    -ms-grid-column: 2;
+    padding-right: 5px;
+    float: left;
+}
+
+.git-file {
+    -ms-grid-column: 3;
+}
+
+.field-input {
+    width: 100%;
+}
+
+.fields {
+    margin-top: 10px;
+}
+
+.comment-input {
+    width: 100%;
+    height: 60px;
+}

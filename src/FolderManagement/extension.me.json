@@ -1,0 +1,35 @@
+﻿{
+  "namespace": "almrangers.vsoextensions.FolderManagement",
+  "version": "1.0.0",
+  "name": "Folder Management",  
+  "description": "An extension for Visual Studio Online that adds the ability to create new folders directly from web access in the code view",
+  "provider": {
+    "name": "ALM Rangers - Wouter de Kort"
+  },
+  "baseUri": "https://localhost:44300/",
+  "icon": "https://localhost:44300//images/VSO_Folder_196x.png",
+  "contributions": {
+    "vss.code.web#sourceTreeItemActions": [
+      {
+        "id": "addFolder",
+        "text": "Create a new folder",
+        "title": "New Folder",
+        "icon": "images/VSO_Folder_16x.png",
+        "group": "actions",
+        "uri": "main.html"
+      }
+    ],
+    "#dialog": [
+      {
+        "id": "createNewFolderDialog",
+        "uri": "dialog.html"
+      }
+    ]
+  },
+  "contributionPoints": {
+    "dialog": {
+      "type": "vss.web#control",
+      "description": "Provider of contribution controls."
+    }
+  }
+}

@@ -1,0 +1,45 @@
+﻿<!-----------------------------------------------------------------------
+ <copyright file="dialog.html">
+    This code is licensed under the MIT License.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+    PARTICULAR PURPOSE AND NONINFRINGEMENT.
+</copyright>
+<summary>
+    Content of the dialog that gets shown when the user wants to create a new folder.
+</summary>
+----------------------------------------------------------------------->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create new folder</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <link href="css/dialog.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+    <div class="folder-directory">
+        <div class="description">Create a new folder in </div>
+        <div class="directory">$(TBD)</div>
+        <div class="git-file">A placeholder file will be added.</div>
+    </div>
+    <div class="fields">
+        <label for="folderName">Folder name</label>
+    </div>
+    <input class="field-input" type="text" id="folderName" value="NewFolder" />
+    <div class="fields">
+        <label for="comment">Checkin comment</label>
+    </div>
+    <textarea class="comment-input" id="comment">Added new folder</textarea>
+    <div class="error-container"></div>
+    <script src="sdk/scripts/VSS.SDK.js"></script>
+    <script src="scripts/dialog.js"></script>
+    <script type="text/javascript">
+        VSS.init({
+            explicitNotifyLoaded: true,
+            setupModuleLoader: true
+        });
+    </script>
+</body>
+</html>
