@@ -1,4 +1,4 @@
-﻿# VSO Extension - Folder Management
+# VSO Extension - Folder Management
 
 ### What
 Easily and quickly create new folders in Code Explorer through the Web Access for TFVC and Git.
