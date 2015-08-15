@@ -1,0 +1,6 @@
+C:\Users\Abel\OneDrive\AbelWork_OneDrive\Microsoft\Rangers\FolderManagement\VSO-Extension-FolderManagement\src\FolderManagement\bin\FolderManagement.dll.config
+C:\Users\Abel\OneDrive\AbelWork_OneDrive\Microsoft\Rangers\FolderManagement\VSO-Extension-FolderManagement\src\FolderManagement\bin\FolderManagement.dll
+C:\Users\Abel\OneDrive\AbelWork_OneDrive\Microsoft\Rangers\FolderManagement\VSO-Extension-FolderManagement\src\FolderManagement\bin\FolderManagement.pdb
+C:\Users\Abel\OneDrive\AbelWork_OneDrive\Microsoft\Rangers\FolderManagement\VSO-Extension-FolderManagement\src\FolderManagement\obj\Debug\FolderManagement.csprojResolveAssemblyReference.cache
+C:\Users\Abel\OneDrive\AbelWork_OneDrive\Microsoft\Rangers\FolderManagement\VSO-Extension-FolderManagement\src\FolderManagement\obj\Debug\FolderManagement.dll
+C:\Users\Abel\OneDrive\AbelWork_OneDrive\Microsoft\Rangers\FolderManagement\VSO-Extension-FolderManagement\src\FolderManagement\obj\Debug\FolderManagement.pdb

@@ -1,4 +1,4 @@
-﻿//---------------------------------------------------------------------
+//---------------------------------------------------------------------
 // <copyright file="FolderManager.ts">
 //    This code is licensed under the MIT License.
 //    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
@@ -10,23 +10,15 @@
 // Base TypeScript class for the Git and TFVC Folder Manager classes.
 // </summary>
 //---------------------------------------------------------------------
-
-interface IFolderManager {
-    dialogCallback;
-}
-
-class FolderManager {
-    protected actionContext;
-
-    constructor(actionContext) {
+var FolderManager = (function () {
+    function FolderManager(actionContext) {
         this.actionContext = actionContext;
     }
-
-    protected refreshBrowserWindow() {
-        VSS.getService("ms.vss-web.navigation-service").then(function (historyService: any) {
+    FolderManager.prototype.refreshBrowserWindow = function () {
+        VSS.getService("ms.vss-web.navigation-service").then(function (historyService) {
             historyService.reload();
         });
-    }
-
-}
-    
+    };
+    return FolderManager;
+})();
+//# sourceMappingURL=FolderManager.js.map

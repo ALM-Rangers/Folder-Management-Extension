@@ -1,4 +1,4 @@
-// Type definitions for Microsoft Visual Studio Services v82.20150430.0900
+// Type definitions for Microsoft Visual Studio Services v86.20150707.1419
 // Project: http://www.visualstudio.com/integrate/extensions/overview
 // Definitions by: Microsoft <vsointegration@microsoft.com>
 
@@ -72,55 +72,34 @@ interface IVssAjaxEventListener {
 * Interface for a class that can fetch auth tokens to be used in AJAX requests.
 */
 interface IAuthTokenManager<TToken> {
-    /**
-     * Issues an unscoped session token for the current user asynchronously. 
-     *
-     * @param name Metadata info to identify the token.
-     * @param force Enables skipping cache and issue a brand new token.
-     * @return Session token.
-     */
-    beginGetUnscopedToken(name?: string, force?: boolean): IPromise<TToken>;
 
     /**
-     * Issues a session token using the specified appId for the current user asynchronously.
+     * Fetch a session token to use for the current user for the given application (or null/empty for an unscoped token).
      *
      * @param appId Id of the application.
      * @param name Metadata info to identify the token.
      * @param force Enables skipping cache and issue a brand new token.
      * @return Session token.
      */
-    beginGetAppToken(appId: string, name?: string, force?: boolean): IPromise<TToken>;
+    getToken(appId?: string, name?: string, force?: boolean): IPromise<TToken>;
 
     /**
-     * Gets the cached unscoped token.
+     * Fetch an app session token to use for the current user for the given application.
      *
+     * @param appId Id of the application.
+     * @param name Metadata info to identify the token.
+     * @param force Enables skipping cache and issue a brand new token.
      * @return Session token.
      */
-    getUnscopedToken(): TToken;
-
+    getAppToken(appId: string, name?: string, force?: boolean): IPromise<TToken>;
+    
     /**
-     * Gets the cached session token for the specified app.
-     * 
-     * @param Id of the application.
-     * @return Session token.
-     */
-    getAppToken(appId: string): TToken;
-
-    /**
-     * Sets the authorization header of the specified request using Basic auth.
-     *
-     * @param request Request to set the authorization header.
-     * @param sessionToken Used for token key.
-     */
-    setBasicAuthHeader(request: XMLHttpRequest, sessionToken: TToken): void;
-
-    /**
-     * Creates the authorization header of the specified request using Basic auth.
+     * Gets the authorization header to use in a request from the given token
      *
      * @param sessionToken Used for token key.
-     * @return the Basic Auth header for specified session token.
+     * @return the value to use for the Authorization header in a request.
      */
-    createBasicAuthHeader(sessionToken: TToken): string;
+    getAuthorizationHeader(sessionToken: TToken): string;
 }
 
 /**
@@ -128,12 +107,26 @@ interface IAuthTokenManager<TToken> {
 * which registers callbacks to receive either a promise’s eventual value or the reason why the promise cannot be fulfilled.
 */
 interface IPromise<T> {
+    /**
+     * Then method which accepts a fulfill delegate which returns a promise or nothing and a reject delegate which returns a promise or nothing. Then returns a new promise.
+     */
     then<U>(onFulfill: (value: T) => IPromise<U> | void, onReject?: (reason: any) => IPromise<U> | void): IPromise<U>;
+
+    /**
+     * Then method which accepts a fulfill delegate which returns a promise or nothing and a reject delegate which returns a reason value or nothing. Then returns a new promise.
+     */
     then<U>(onFulfill: (value: T) => IPromise<U> | void, onReject?: (reason: any) => U | void): IPromise<U>;
+
+    /**
+     * Then method which accepts a fulfill delegate which returns a value or nothing and a reject delegate which returns a promise or nothing. Then returns a new promise.
+     */
     then<U>(onFulfill: (value: T) => U | void, onReject?: (reason: any) => IPromise<U> | void): IPromise<U>;
+
+    /**
+     * Then method which accepts a fulfill delegate which returns a value or nothing and a reject delegate which returns a reason value or nothing. Then returns a new promise.
+     */
     then<U>(onFulfill: (value: T) => U | void, onReject?: (reason: any) => U | void): IPromise<U>;
 }
-
 declare var Sys;
 
 interface EventTarget {
@@ -246,9 +239,6 @@ interface IKeyValuePair<TKey, TValue> {
 
 declare var require: IRequire;
 declare var define: IDefine;
-// defined in Loader.debug.js.  We need for config
-// TODO - need to expose this in a better way
-declare var __moduleManager: any;
 //----------------------------------------------------------
 // Common interfaces specific to WebPlatform area
 //----------------------------------------------------------
@@ -257,15 +247,24 @@ declare var __moduleManager: any;
 * Interface for a single XDM channel
 */
 interface IXDMChannel {
-
+    
     /**
-    * Post a message to the other side of the XDM channel
+    * Invoke a method via RPC. Lookup the registered object on the remote end of the channel and invoke the specified method.
     *
     * @param method Name of the method to invoke
+    * @param instanceId unique id of the registered object
     * @param params Arguments to the method to invoke
-    * @return promise completed if/when the other endpoint replies
+    * @param instanceContextData Optional context data to pass to a registered object's factory method
     */
-    postMessage<T>(method: string, params?: any[]): IPromise<T>;
+    invokeRemoteMethod<T>(methodName: string, instanceId: string, params?: any[], instanceContextData?: Object): IPromise<T>;
+
+    /**
+    * Get a proxied object that represents the object registered with the given instance id on the remote side of this channel.
+    *
+    * @param instanceId unique id of the registered object
+    * @param contextData Optional context data to pass to a registered object's factory method
+    */
+    getRemoteObjectProxy<T>(instanceId: string, contextData?: Object): IPromise<T>;
 
     /**
     * Get the object registry to handle messages from this specific channel.
@@ -287,46 +286,111 @@ interface IXDMChannelManager {
     * @param targetOrigin Url of the target iframe (if known)
     */
     addChannel(window: Window, targetOrigin?: string): IXDMChannel;
-
-    /**
-    * Broadcast a message to all channels managed by this channel manager
-    *
-    * @param method Name of the method to invoke
-    * @param params Arguments to the method to invoke
-    * @param success Callback method to invoke when the remote procedure succeeds
-    * @param error Callback method to invoke when the remote procedure fails
-    */
-    broadcastMessage(method: string, params?: any[]);
 }
 
 /**
 * Registry of XDM objects that can be invoked by an XDM channel
 */
 interface IXDMObjectRegistry {
+    
+    /**
+    * Register an object (instance or factory method) exposed by this frame to callers in a remote frame
+    *
+    * @param instanceId unique id of the registered object
+    * @param instance Either: (1) an object instance, or (2) a function that takes optional context data and returns an object instance.
+    */
+    register(instanceId: string, instance: Object | { (contextData?: any): Object; }): void;
 
     /**
-    * Register an object so that its methods can be invoked in an XDM channel
+    * Get an instance of an object registered with the given id
     *
-    * @param obj object to register. This object should have functions on it that can be invoked remotely
-    * @param name Unique name of the object to register.
+    * @param instanceId unique id of the registered object
+    * @param contextData Optional context data to pass to the contructor of an object factory method
     */
-    register(obj: any, name: string);
+    getInstance<T>(instanceId: string, contextData?: Object): T;
+}
+
+/**
+* Options for the extension's initialization method
+*/
+interface IExtensionInitializationOptions {
+
+    /**
+    * Set to true if the extension will explicitly call notifyLoadSucceeded or notifyLoadFailed
+    * itself to indicate that the extension is done loading (stops UI loading indicator in the host).
+    * If false (the default) the extension is considered ready as soon as init is called.
+    */
+    explicitNotifyLoaded?: boolean;
+
+    /**
+    * Set to true if the extension is going to consume any VSS script libraries.
+    * For example, controls, REST clients, services, etc.
+    * This pulls in the script loader and configuration data from the host frame so that
+    * 'require' statements can be used to load VSO modules. A call to VSS.require will
+    * effectively turn this option on, even if not specified in the VSS.init handshake.
+    */
+    usePlatformScripts?: boolean;
+
+    /**
+    * Set to true if the extension desires to use VSS platform CSS styles. If not explicitly set,
+    * the default value is the value of 'usePlatformScripts'.
+    */
+    usePlatformStyles?: boolean;
+
+    /**
+    * Extension-specific AMD module loader configuration. This configuration
+    * will be merged with the VSO-specific configuration.
+    */
+    moduleLoaderConfig?: ModuleLoaderConfiguration;
+
+    /**
+    * Optional callback method that gets invoked when this extension frame is reused by another contribution
+    * which shares the same URI of the contribution that originally caused this extension frame to be loaded.
+    */
+    extensionReusedCallback?: (contribution: Contribution) => void;
 }
 
 /**
 * Data passed from the host to an extension frame via the initial handshake
 */
 interface IHostHandshakeData {
+
+    /**
+    * Static context information about the current page
+    */
     pageContext: PageContext;
+
+    /**
+    * Initial configuration for the extension frame
+    */
     initialConfig?: any;
-    appContext: IExtensionContext;
+
+    /**
+    * Context information about the extension
+    */
+    extensionContext: IExtensionContext;
+
+    /**
+    * The contribution that caused the extension frame to be loaded.
+    */
+    contribution: Contribution;
 }
 
 /**
 * Data passed to the host from an extension frame via the initial handshake
 */
-interface IAppHandshakeData {
+interface IExtensionHandshakeData {
+
+    /**
+    * If true, consider the extension loaded upon completion of the initial handshake.
+    */
     notifyLoadSucceeded: boolean;
+
+    /**
+    * Optional callback method that gets invoked when this extension frame is reused by another contribution
+    * which shares the same URI of the contribution that originally caused this extension frame to be loaded.
+    */
+    extensionReusedCallback?: (contribution: Contribution) => void;
 }
 
 /**
@@ -340,53 +404,75 @@ interface IExternalControlInterfaceInfo {
 * Context about the app that owns the content that is being hosted
 */
 interface IExtensionContext {
+    /**
+    * Unique GUID of the extension
+    */
     id: string;
-    name: string;
-    namespace: string;
+
+    /**
+    * Friendly unique id of the publisher
+    */
+    publisherId: string;
+
+    /**
+    * Friendly id of the extension (unique within the publisher)
+    */
+    extensionId: string;
+
+    /**
+    * Version of the extension
+    */
     version: string;
+
+    /**
+    * The base uri to be used with relative urls in contribution properties
+    */
     baseUri: string;
+}
+
+interface IDefaultGetServiceContext {
+
+    webContext: WebContext;
+
+    extensionContext: IExtensionContext;
 }
 
 /**
 * Session token whose value can be added to the Authorization header in requests to VSO endpoints
 */
 interface ISessionToken {
+
+    /**
+    * The registered VSS auth application id
+    */
     appId: string;
+
+    /**
+    * Name describing the token
+    */
     name: string;
+
+    /**
+    * Token value
+    */
     token: string;
 }
 
-
 /**
-* Information about an individual contribution
+* A Contribution with its containing extension
 */
-interface IContribution {
+interface IExtensionContribution extends Contribution {
 
     /**
-    * Id of the contribution (id property)
+    * The extension that owns this contribution
     */
-    id: string;
-
-    /**
-    * Unique id of the extension that is contributing this contribution
-    */
-    extensionId: string;
-
-    /**
-    * Full contribution point id
-    */
-    pointId: string;
-
-    /**
-    * Contribution properties lookup
-    */
-    properties?: IDictionaryStringTo<any>;
+    extension: Extension;
 }
 
 /**
 * Information about an individual contribution that contributes one or more services registered by id.
 */
-interface IServiceContribution extends IContribution {
+interface IServiceContribution extends IExtensionContribution {
     
     /**
     * Get the instance of an object registered by this contribution
@@ -394,7 +480,7 @@ interface IServiceContribution extends IContribution {
     * @param objectId Id of the registered object (defaults to the id property of the contribution)
     * @param context Optional context to use when getting the object.
     */
-    getInstance: <T>(objectId?: string, context?: any) => IPromise<T>;
+    getInstance<T>(objectId?: string, context?: any): IPromise<T>;
 }
 
 interface IHostDialogOptions {
@@ -452,19 +538,24 @@ interface IHostDialogService {
     /**
     * Open a modal dialog in the host frame which will get its content from a contributed control.
     * 
-    * @param contribution url for dialog contents
+    * @param contributionId The id of the control contribution to host in the dialog
     * @param dialogOptions options.title - title of dialog
     * @param contributionConfig Initial configuration to pass to the contribution control.
     * @param postContent Optional data to post to the contribution endpoint. If not specified, a GET request will be performed.
     */
-    openDialog(contribution: IContribution, dialogOptions: IHostDialogOptions, contributionConfig?: Object, postContent?: Object): IPromise<IExternalDialog>;
+    openDialog(contributionId: string, dialogOptions: IHostDialogOptions, contributionConfig?: Object, postContent?: Object): IPromise<IExternalDialog>;
 }
 
 /**
-* Service which allows interaction with the browser history of the host frame
+* Service which allows interaction with the browser location and navigation of the host frame
 */
-interface IHostHistoryService {
+interface IHostNavigationService {
     
+    /**
+     * Reloads the parent frame
+     */
+    reload();
+
     /**
     * Add a callback to be invoked each time the hash navigation has changed
     *
@@ -477,7 +568,7 @@ interface IHostHistoryService {
     *
     * @return Hash part of the host page's url (url following #)
     */
-    getHash(): string;
+    getHash(): IPromise<string>;
 
     /**
     * Sets the provided hash from the hosted content.
@@ -488,7 +579,106 @@ interface IHostHistoryService {
 }
 
 /**
-* Iterface for a registered object that contributes menu item(s)
+* Service which allows for getting and setting of extension data
+*/
+interface IExtensionDataService {
+
+    /**
+    * Returns a promise for retrieving a setting at the provided key and scope
+    *
+    * @param key The key to retrieve a value for
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    getValue<T>(key: string, documentOptions?: IDocumentOptions): IPromise<T>;
+
+    /**
+    * Returns a promise for saving a setting at the provided key and scope
+    *
+    * @param key The key to save a value for
+    * @param value The value to save
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    setValue<T>(key: string, value: T, documentOptions?: IDocumentOptions): IPromise<T>;
+
+    /**
+    * Returns a promise for getting a document with the provided id in the provided collection
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param id The id of the document in the collection
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    getDocument(collectionName: string, id: string, documentOptions?: IDocumentOptions): IPromise<any>;
+
+    /**
+    * Returns a promise for getting all of the documents in the provided collection
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    getDocuments(collectionName: string, documentOptions?: IDocumentOptions): IPromise<any[]>;
+
+    /**
+    * Returns a promise for creating a document in the provided collection
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param doc The document to store
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    createDocument(collectionName: string, doc: any, documentOptions?: IDocumentOptions): IPromise<any>;
+
+    /**
+    * Returns a promise for setting a document in the provided collection
+    * Creates the document if it does not exist, otherwise updates the existing document with the id provided
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param doc The document to store
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    setDocument(collectionName: string, doc: any, documentOptions?: IDocumentOptions): IPromise<any>;
+
+    /**
+    * Returns a promise for updating a document in the provided collection
+    * A document with the id provided must exist
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param doc The document to store
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    updateDocument(collectionName: string, doc: any, documentOptions?: IDocumentOptions): IPromise<any>;
+
+    /**
+    * Returns a promise for deleting the document at the provided scope, collection and id
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param id The id of the document in the collection
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    deleteDocument(collectionName: string, id: string, documentOptions?: IDocumentOptions): IPromise<void>;
+}
+
+/**
+* Interface for options that can be supplied with document actions
+*/
+interface IDocumentOptions {
+    /**
+    * The scope of where the document is stored. Can be Account or User.
+    */
+    scopeType: string;
+
+    /**
+    * The value of the scope where the document is stored. Can be Current or Me.
+    */
+    scopeValue?: string;
+
+    /**
+    * The default value to return when using getValue(). If the document has no value,
+    * this value will be used instead.
+    */
+    defaultValue?: any;
+}
+
+/**
+* Interface for a registered object that contributes menu item(s)
 */
 interface IContributedMenuSource {
 
@@ -545,6 +735,11 @@ interface IContributedMenuItem {
     icon?: string;
 
     /**
+    * If true, do not render an icon or space for an icon.
+    */
+    noIcon?: boolean;
+
+    /**
     * If this menu item has a sub menu, these are the contributed child items
     */
     childItems?: IContributedMenuItem[];
@@ -570,6 +765,7 @@ interface IContributedMenuItem {
 
 // Generated data for the following assemblies:
 // Microsoft.TeamFoundation.Server.WebAccess.Platform
+// Microsoft.VisualStudio.Services.WebApi
 //----------------------------------------------------------
 
 
@@ -577,6 +773,11 @@ interface AccessPointModel {
     authority: string;
     scheme: string;
     uri: string;
+}
+
+interface AppDataSetting {
+    key: string;
+    value: string;
 }
 
 interface AppInsightsConfiguration {
@@ -628,13 +829,35 @@ interface ContextIdentifier {
     name: string;
 }
 
+interface Contribution {
+    description: string;
+    id: string;
+    properties: any;
+    targets: string[];
+    type: string;
+}
+
+interface ContributionBase {
+    description: string;
+    id: string;
+}
+
 interface ContributionContext {
     containerCssClass: string;
+    contributionData: any;
     cssReferences: string[];
+    cssThemedRoot: string;
     moduleLoaderConfig: ModuleLoaderConfiguration;
-    partialContent: boolean;
     scriptModules: string[];
+    serviceLocations: ServiceLocations;
     serviceUrl: string;
+}
+
+interface ContributionIdentifier {
+    extensionId: string;
+    id: string;
+    publisherId: string;
+    relativeId: string;
 }
 
 interface ContributionPath {
@@ -646,6 +869,48 @@ declare enum ContributionPathType {
     Default = 0,
     Resource = 1,
     Bundle = 2,
+}
+
+interface ContributionPoint {
+    description: string;
+    extensionId: string;
+    id: string;
+    publisherId: string;
+    relativeId: string;
+    type: string;
+}
+
+interface ContributionPropertyDescription {
+    description: string;
+    name: string;
+    required: boolean;
+    type: ContributionPropertyType;
+}
+
+declare enum ContributionPropertyType {
+    Unknown = 0,
+    String = 1,
+    Uri = 2,
+    Guid = 4,
+    Boolean = 8,
+    Integer = 16,
+    Double = 32,
+    DateTime = 64,
+    Dictionary = 128,
+    Array = 256,
+    Object = 512,
+}
+
+interface ContributionProvider {
+    name: string;
+    website: string;
+}
+
+interface ContributionType {
+    description: string;
+    id: string;
+    name: string;
+    properties: { [key: string]: ContributionPropertyDescription; };
 }
 
 interface CoreReferencesContext {
@@ -677,6 +942,102 @@ interface ExtendedHostContext {
     relativeUri: string;
     scheme: string;
     uri: string;
+}
+
+interface Extension {
+    baseUri: string;
+    contributions: Contribution[];
+    contributionTypes: ContributionType[];
+    eventCallbacks: ExtensionEventCallbackCollection;
+    extensionId: string;
+    flags: ExtensionFlags;
+    id: string;
+    manifestVersion: any;
+    publisherId: string;
+    registrationId: string;
+    scopes: string[];
+    version: string;
+}
+
+interface ExtensionEventCallback {
+    uri: string;
+}
+
+interface ExtensionEventCallbackCollection {
+    versionCheck: ExtensionEventCallback;
+}
+
+declare enum ExtensionFlags {
+    BuiltIn = 1,
+    Trusted = 2,
+}
+
+interface ExtensionInstallationState {
+    enabled: boolean;
+    lastUpdated: Date;
+    lastUpdatedBy: string;
+}
+
+interface ExtensionManifest {
+    baseUri: string;
+    contributions: Contribution[];
+    contributionTypes: ContributionType[];
+    eventCallbacks: ExtensionEventCallbackCollection;
+    manifestVersion: any;
+    scopes: string[];
+}
+
+interface ExtensionManifestOld {
+    baseUri: string;
+    contributionPoints: { [key: string]: ContributionPoint; };
+    contributions: { [key: string]: any[]; };
+    contributionTypes: { [key: string]: any; };
+    description: string;
+    icon: string;
+    name: string;
+    namespace: string;
+    provider: ContributionProvider;
+    version: string;
+    versionCheckUrl: string;
+}
+
+interface ExtensionOld {
+    baseUri: string;
+    contributionPoints: { [key: string]: ContributionPoint; };
+    contributions: { [key: string]: any[]; };
+    contributionTypes: { [key: string]: any; };
+    description: string;
+    icon: string;
+    id: string;
+    name: string;
+    namespace: string;
+    provider: ContributionProvider;
+    publishInfo: ExtensionPublishInfo;
+    version: string;
+    versionCheckUrl: string;
+}
+
+interface ExtensionPublishInfo {
+    lastUpdated: Date;
+    ownerId: string;
+    store: ExtensionStore;
+}
+
+interface ExtensionSetting {
+    key: string;
+    value: any;
+}
+
+interface ExtensionStore {
+    extensionStoreType: ExtensionStoreType;
+    id: number;
+    target: string;
+}
+
+declare enum ExtensionStoreType {
+    Unknown = 0,
+    BuiltIn = 1,
+    Developer = 2,
 }
 
 interface FeatureAvailabilityContext {
@@ -716,7 +1077,7 @@ interface HubGroup {
 
 interface HubsContext {
     hubGroups: HubGroup[];
-    hubGroupsContributionPointId: string;
+    hubGroupsCollectionContributionId: string;
     hubs: Hub[];
     selectedHubGroupId: string;
 }
@@ -788,16 +1149,26 @@ interface PageContext {
     moduleLoaderConfig: ModuleLoaderConfiguration;
     navigation: NavigationContext;
     serviceInstanceId: string;
-    serviceLocations: { [key: string]: { [key: number]: string; }; };
+    serviceLocations: ServiceLocations;
     timeZonesConfiguration: TimeZonesConfiguration;
     webAccessConfiguration: ConfigurationContext;
     webContext: WebContext;
+}
+
+interface ServiceLocations {
+    locations: { [key: string]: { [key: number]: string; }; };
 }
 
 interface StylesheetReference {
     highContrastUrl: string;
     isCoreStylesheet: boolean;
     url: string;
+}
+
+interface SupportedExtension {
+    extension: string;
+    publisher: string;
+    version: string;
 }
 
 interface TeamContext {
@@ -824,6 +1195,7 @@ interface TfsServiceHostDescriptor {
     hostType: any;
     id: string;
     name: string;
+    relVdir: string;
     vdir: string;
 }
 
@@ -864,42 +1236,31 @@ declare module XDM {
         reject: (reason: any) => void;
         promise: IPromise<T>;
     }
-    interface IXDMMethodInfo {
-        method: Function;
-        thisObj: any;
-    }
     /**
     * Create a new deferred object
     */
     function createDeferred<T>(): IDeferred<T>;
     /**
-     * Catalog of objects exposed for XDM where the key is as follows:
-     *
-     * ClassName{[instanceId]}.method
-     *
-     * Examples:
-     *     Access singleton Calculator's add function - Calculator.add(3,5)
-     *     Key: "Calculator"
-     *
-     * XDMChannel looks up object from the IJsonRpcMessage passed into onMessage
+     * Catalog of objects exposed for XDM
      */
     class XDMObjectRegistry implements IXDMObjectRegistry {
         private _registeredObjects;
         /**
-        * Lookup a method on a registered object. Returns null if the object is
-        * not found or the method does not exist on the object.
+        * Register an object (instance or factory method) exposed by this frame to callers in a remote frame
         *
-        * @param fullMethodPath The name of the registered object + '.' + the method name
-        * @return XDM method info
+        * @param instanceId unique id of the registered object
+        * @param instance Either: (1) an object instance, or (2) a function that takes optional context data and returns an object instance.
         */
-        getRegisteredMethodInfo(fullMethodPath: string): IXDMMethodInfo;
+        register(instanceId: string, instance: Object | {
+            (contextData?: any): Object;
+        }): void;
         /**
-        * Register an object so that its methods can be invoked in an XDM channel
+        * Get an instance of an object registered with the given id
         *
-        * @param obj object to register. This object should have functions on it that can be invoked remotely
-        * @param name Unique name of the object to register.
+        * @param instanceId unique id of the registered object
+        * @param contextData Optional context data to pass to a registered object's factory method
         */
-        register(obj: any, name: string): void;
+        getInstance<T>(instanceId: string, contextData?: Object): T;
     }
     /**
     * The registry of global XDM handlers
@@ -931,14 +1292,23 @@ declare module XDM {
         */
         getObjectRegistry(): IXDMObjectRegistry;
         /**
-        * Post a message to the other side of the XDM channel
+        * Invoke a method via RPC. Lookup the registered object on the remote end of the channel and invoke the specified method.
         *
         * @param method Name of the method to invoke
+        * @param instanceId unique id of the registered object
         * @param params Arguments to the method to invoke
-        * @param success Callback method to invoke when the remote procedure succeeds
-        * @param error Callback method to invoke when the remote procedure fails
+        * @param instanceContextData Optional context data to pass to a registered object's factory method
         */
-        postMessage<T>(method: string, params?: any[]): IPromise<T>;
+        invokeRemoteMethod<T>(methodName: string, instanceId: string, params?: any[], instanceContextData?: Object): IPromise<T>;
+        /**
+        * Get a proxied object that represents the object registered with the given instance id on the remote side of this channel.
+        *
+        * @param instanceId unique id of the registered object
+        * @param contextData Optional context data to pass to a registered object's factory method
+        */
+        getRemoteObjectProxy<T>(instanceId: string, contextData?: Object): IPromise<T>;
+        private invokeMethod(registeredInstance, rpcMessage);
+        private getRegisteredObject(instanceId, instanceContext?);
         /**
         * Handle a received message on this channel. Dispatch to the appropriate object found via object registry
         *
@@ -971,47 +1341,38 @@ declare module XDM {
         * @param targetOrigin Url of the target iframe (if known)
         */
         addChannel(window: Window, targetOrigin?: string): IXDMChannel;
-        /**
-        * Broadcast a message to all channels managed by this channel manager
-        *
-        * @param method Name of the method to invoke
-        * @param params Arguments to the method to invoke
-        * @param success Callback method to invoke when the remote procedure succeeds
-        * @param error Callback method to invoke when the remote procedure fails
-        */
-        broadcastMessage(method: string, params?: any[]): void;
         private _handleMessageReceived(event);
         private _subscribe(windowObj);
     }
 }
 declare module VSS {
+    var VssSDKVersion: number;
     /**
-    * Options for the extension's initialization method
+    * Service Ids for core services (to be used in VSS.getService)
     */
-    interface ExtensionInitializationOptions {
+    module ServiceIds {
         /**
-        * Set to true if the extension will explicitly call notifyLoadSucceeded or notifyLoadFailed
-        * itself to indicate that the extension is done loading (stops UI loading indicator in the host).
-        * If false (the default) the extension is considered ready as soon as init is called.
+        * Service for showing dialogs in the host frame
+        * Use: <IHostDialogService>
         */
-        explicitNotifyLoaded?: boolean;
+        var Dialog: string;
         /**
-        * If true setup the AMD script module loader with the host's AMD configuration
-        * so that 'require' statements can be used to load VSO modules.
+        * Service for interacting with the host frame's navigation (getting/updating the address/hash, reloading the page, etc.)
+        * Use: <IHostNavigationService>
         */
-        setupModuleLoader?: boolean;
+        var Navigation: string;
         /**
-        * Extension-specific AMD module loader configuration. This configuration
-        * will be merged with the VSO-specific configuration.
+        * Service for interacting with extension data (setting/setting documents and collections)
+        * Use: <IExtensionDataService>
         */
-        moduleLoaderConfig?: ModuleLoaderConfiguration;
+        var ExtensionData: string;
     }
     /**
      * Initiates the handshake with the host window.
      *
      * @param options Initialization options for the extension.
      */
-    function init(options: ExtensionInitializationOptions): void;
+    function init(options: IExtensionInitializationOptions): void;
     /**
      * Ensures that the AMD loader from the host is configured and fetches a script (AMD) module
      * (and its dependencies). If no callback is supplied, this will still perform an asynchronous
@@ -1027,6 +1388,10 @@ declare module VSS {
      * @param callback Method called once the modules have been loaded.
      */
     function require(modules: string[] | string, callback?: Function): void;
+    /**
+    * Register a callback that gets called once the initial setup/handshake has completed.
+    * If the initial setup is already completed, the callback is invoked at the end of the current call stack.
+    */
     function ready(callback: () => void): void;
     /**
     * Notifies the host that the extension successfully loaded (stop showing the loading indicator)
@@ -1045,23 +1410,32 @@ declare module VSS {
     */
     function getConfiguration(): any;
     /**
-    * Get the context about the app that owns the content that is being hosted
+    * Get the context about the extension that owns the content that is being hosted
     */
     function getExtensionContext(): IExtensionContext;
     /**
+    * Gets the information about the contribution that first caused this extension to load.
+    */
+    function getContribution(): Contribution;
+    /**
     * Get a contributed service from the parent host.
     *
-    * @param serviceId Id of the vss.web#service contribution to get the instance of
+    * @param contributionId Full Id of the service contribution to get the instance of
     * @param context Optional context information to use when obtaining the service instance
     */
-    function getService<T>(serviceId: string, context?: Object): IPromise<T>;
+    function getService<T>(contributionId: string, context?: Object): IPromise<T>;
     /**
-    * For a given contribution point id, get contributions which contribute background services.
+    * Get the contribution with the given contribution id. The returned contribution has a method to get a registered object within that contribution.
     *
-    * @param contributionPointId Contribution point id to query
-    * @param contributionId Optional filter to only include contributions with the given id
+    * @param contributionId Id of the contribution to get
     */
-    function getServiceContributions<T>(contributionPointId: string, contributionId?: string): IPromise<IServiceContribution[]>;
+    function getServiceContribution(contributionId: string): IPromise<IServiceContribution>;
+    /**
+    * Get contributions that target a given contribution id. The returned contributions have a method to get a registered object within that contribution.
+    *
+    * @param targetContributionId Contributions that target the contribution with this id will be returned
+    */
+    function getServiceContributions(targetContributionId: string): IPromise<IServiceContribution[]>;
     /**
     * Register an object (instance or factory method) that this extension exposes to the host frame.
     *
@@ -1072,14 +1446,24 @@ declare module VSS {
         (contextData?: any): Object;
     }): void;
     /**
+    * Get an instance of an object registered with the given id
+    *
+    * @param instanceId unique id of the registered object
+    * @param contextData Optional context data to pass to the contructor of an object factory method
+    */
+    function getRegisteredObject(instanceId: string, contextData?: Object): Object;
+    /**
     * Fetch an access token which will allow calls to be made to other VSO services
     */
     function getAccessToken(): IPromise<ISessionToken>;
     /**
+    * Fetch an token which can be used to identify the current user
+    */
+    function getAppToken(): IPromise<ISessionToken>;
+    /**
     * Requests the parent window to resize the container for this extension based on the current extension size.
     */
     function resize(): void;
-    function api(path: string, apiResourceScope: string, verb: string, headers: any, params: any, success?: (response: string) => void, error?: (exception) => void): void;
 }
 declare module "VSS/Adapters/Knockout" {
 import Controls = require("VSS/Controls");
@@ -1222,6 +1606,16 @@ export interface JQueryAjaxErrorResult extends JQueryAjaxResult {
     errorThrown: any;
 }
 /**
+* Custom DataTypes that can be used in addition to jQuery's default text, json, xml, etc. types.
+* This module provides custom ajaxTransports for these types
+*/
+export module CustomTransportDataTypes {
+    /**
+    * Raw binary data returned as an ArrayBuffer
+    */
+    var Binary: string;
+}
+/**
 * Issue an AJAX request. This is a wrapper around jquery's ajax method that handles VSS authentication
 * and triggers events that can be listened to by other modules.
 *
@@ -1349,15 +1743,26 @@ export interface CustomerIntelligenceEvent {
         [key: string]: any;
     };
 }
+export enum DelegatedAppTokenType {
+    Session = 0,
+    App = 1,
+}
 export interface WebSessionToken {
     appId: string;
     force: boolean;
     name: string;
     token: string;
+    tokenType: DelegatedAppTokenType;
 }
 export var TypeInfo: {
     CustomerIntelligenceEvent: {
         fields: any;
+    };
+    DelegatedAppTokenType: {
+        enumValues: {
+            "session": number;
+            "app": number;
+        };
     };
     WebSessionToken: {
         fields: any;
@@ -1370,6 +1775,8 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class AuthenticationHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {Contracts.WebSessionToken} sessionToken
      * @return IPromise<Contracts.WebSessionToken>
      */
@@ -1378,6 +1785,18 @@ export class AuthenticationHttpClient extends VSS_WebApi.VssHttpClient {
 }
 declare module "VSS/Authentication/Services" {
 import Authentication_Contracts = require("VSS/Authentication/Contracts");
+/**
+* Helper methods for dealing with basic auth
+*/
+export module BasicAuthHelpers {
+    /**
+    * Create the Authorization header value given the basic auth credentials
+    *
+    * @param user The username portion of the credentials
+    * @param password The password portion of the credentials
+    */
+    function getBasicAuthHeader(user: string, password: string): string;
+}
 export var authTokenManager: IAuthTokenManager<Authentication_Contracts.WebSessionToken>;
 }
 declare module "VSS/Common/Constants/Platform" {
@@ -1389,116 +1808,118 @@ export module WebAccessCustomerIntelligenceConstants {
 }
 export module WebPlatformFeatureFlags {
     var VisualStudioServicesContribution: string;
+    var VisualStudioServicesGallery: string;
+    var ClientSideErrorLogging: string;
 }
 }
 declare module "VSS/Common/Contracts/FormInput" {
 export enum InputDataType {
     /**
-    * No data type is specified.
-    */
+     * No data type is specified.
+     */
     None = 0,
     /**
-    * Represents a textual value.
-    */
+     * Represents a textual value.
+     */
     String = 10,
     /**
-    * Represents a numberic value.
-    */
+     * Represents a numberic value.
+     */
     Number = 20,
     /**
-    * Represents a value of true or false.
-    */
+     * Represents a value of true or false.
+     */
     Boolean = 30,
     /**
-    * Represents a Guid.
-    */
+     * Represents a Guid.
+     */
     Guid = 40,
     /**
-    * Represents a URI.
-    */
+     * Represents a URI.
+     */
     Uri = 50,
 }
 /**
-* Describes an input for subscriptions.
-*/
+ * Describes an input for subscriptions.
+ */
 export interface InputDescriptor {
     /**
-    * The ids of all inputs that the value of this input is dependent on.
-    */
+     * The ids of all inputs that the value of this input is dependent on.
+     */
     dependencyInputIds: string[];
     /**
-    * Description of what this input is used for
-    */
+     * Description of what this input is used for
+     */
     description: string;
     /**
-    * The group localized name to which this input belongs and can be shown as a header for the container that will include all the inputs in the group.
-    */
+     * The group localized name to which this input belongs and can be shown as a header for the container that will include all the inputs in the group.
+     */
     groupName: string;
     /**
-    * If true, the value information for this input is dynamic and should be fetched when the value of dependency inputs change.
-    */
+     * If true, the value information for this input is dynamic and should be fetched when the value of dependency inputs change.
+     */
     hasDynamicValueInformation: boolean;
     /**
-    * Identifier for the subscription input
-    */
+     * Identifier for the subscription input
+     */
     id: string;
     /**
-    * Mode in which the value of this input should be entered
-    */
+     * Mode in which the value of this input should be entered
+     */
     inputMode: InputMode;
     /**
-    * Gets whether this input is confidential, such as for a password or application key
-    */
+     * Gets whether this input is confidential, such as for a password or application key
+     */
     isConfidential: boolean;
     /**
-    * Localized name which can be shown as a label for the subscription input
-    */
+     * Localized name which can be shown as a label for the subscription input
+     */
     name: string;
     /**
-    * Gets whether this input is included in the default generated action description.
-    */
+     * Gets whether this input is included in the default generated action description.
+     */
     useInDefaultDescription: boolean;
     /**
-    * Information to use to validate this input's value
-    */
+     * Information to use to validate this input's value
+     */
     validation: InputValidation;
     /**
-    * A hint for input value. It can be used in the UI as the input placeholder.
-    */
+     * A hint for input value. It can be used in the UI as the input placeholder.
+     */
     valueHint: string;
     /**
-    * Information about possible values for this input
-    */
+     * Information about possible values for this input
+     */
     values: InputValues;
 }
 /**
-* Defines a filter for subscription inputs. The filter matches a set of inputs if any (one or more) of the groups evaluates to true.
-*/
+ * Defines a filter for subscription inputs. The filter matches a set of inputs if any (one or more) of the groups evaluates to true.
+ */
 export interface InputFilter {
     /**
-    * Groups of input filter expressions. This filter matches a set of inputs if any (one or more) of the groups evaluates to true.
-    */
+     * Groups of input filter expressions. This filter matches a set of inputs if any (one or more) of the groups evaluates to true.
+     */
     conditions: InputFilterCondition[];
 }
 /**
-* An expression which can be applied to filter a list of subscription inputs
-*/
+ * An expression which can be applied to filter a list of subscription inputs
+ */
 export interface InputFilterCondition {
     /**
-    * Whether or not to do a case sensitive match
-    */
+     * Whether or not to do a case sensitive match
+     */
     caseSensitive: boolean;
     /**
-    * The Id of the input to filter on
-    */
+     * The Id of the input to filter on
+     */
     inputId: string;
     /**
-    * The &quot;expected&quot; input value to compare with the actual input value
-    */
+     * The "expected" input value to compare with the actual input value
+     */
     inputValue: string;
     /**
-    * The operator applied between the expected and actual input value
-    */
+     * The operator applied between the expected and actual input value
+     */
     operator: InputFilterOperator;
 }
 export enum InputFilterOperator {
@@ -1507,37 +1928,37 @@ export enum InputFilterOperator {
 }
 export enum InputMode {
     /**
-    * This input should not be shown in the UI
-    */
+     * This input should not be shown in the UI
+     */
     None = 0,
     /**
-    * An input text box should be shown
-    */
+     * An input text box should be shown
+     */
     TextBox = 10,
     /**
-    * An password input box should be shown
-    */
+     * An password input box should be shown
+     */
     PasswordBox = 20,
     /**
-    * A select/combo control should be shown
-    */
+     * A select/combo control should be shown
+     */
     Combo = 30,
     /**
-    * Radio buttons should be shown
-    */
+     * Radio buttons should be shown
+     */
     RadioButtons = 40,
     /**
-    * Checkbox should be shown(for true/false values)
-    */
+     * Checkbox should be shown(for true/false values)
+     */
     CheckBox = 50,
     /**
-    * A multi-line text area should be shown
-    */
+     * A multi-line text area should be shown
+     */
     TextArea = 60,
 }
 /**
-* Describes what values are valid for a subscription input
-*/
+ * Describes what values are valid for a subscription input
+ */
 export interface InputValidation {
     dataType: InputDataType;
     isRequired: boolean;
@@ -1549,64 +1970,64 @@ export interface InputValidation {
     patternMismatchErrorMessage: string;
 }
 /**
-* Information about a single value for an input
-*/
+ * Information about a single value for an input
+ */
 export interface InputValue {
     /**
-    * Any other data about this input
-    */
+     * Any other data about this input
+     */
     data: {
         [key: string]: any;
     };
     /**
-    * The text to show for the display of this value
-    */
+     * The text to show for the display of this value
+     */
     displayValue: string;
     /**
-    * The value to store for this input
-    */
+     * The value to store for this input
+     */
     value: string;
 }
 /**
-* Information about the possible/allowed values for a given subscription input
-*/
+ * Information about the possible/allowed values for a given subscription input
+ */
 export interface InputValues {
     /**
-    * The default value to use for this input
-    */
+     * The default value to use for this input
+     */
     defaultValue: string;
     /**
-    * Errors encountered while computing dynamic values.
-    */
+     * Errors encountered while computing dynamic values.
+     */
     error: InputValuesError;
     /**
-    * The id of the input
-    */
+     * The id of the input
+     */
     inputId: string;
     /**
-    * Should this input be disabled
-    */
+     * Should this input be disabled
+     */
     isDisabled: boolean;
     /**
-    * Should the value be restricted to one of the values in the PossibleValues (True) or are the values in PossibleValues just a suggestion (False)
-    */
+     * Should the value be restricted to one of the values in the PossibleValues (True) or are the values in PossibleValues just a suggestion (False)
+     */
     isLimitedToPossibleValues: boolean;
     /**
-    * Should this input be made read-only
-    */
+     * Should this input be made read-only
+     */
     isReadOnly: boolean;
     /**
-    * Possible values that this input can take
-    */
+     * Possible values that this input can take
+     */
     possibleValues: InputValue[];
 }
 /**
-* Error information related to a subscription input value.
-*/
+ * Error information related to a subscription input value.
+ */
 export interface InputValuesError {
     /**
-    * The error message.
-    */
+     * The error message.
+     */
     message: string;
 }
 export interface InputValuesQuery {
@@ -1614,12 +2035,12 @@ export interface InputValuesQuery {
         [key: string]: string;
     };
     /**
-    * The input values to return on input, and the result from the consumer on output.
-    */
+     * The input values to return on input, and the result from the consumer on output.
+     */
     inputValues: InputValues[];
     /**
-    * Subscription containing information about the publisher/consumer and the current input values
-    */
+     * Subscription containing information about the publisher/consumer and the current input values
+     */
     resource: any;
 }
 export var TypeInfo: {
@@ -1730,10 +2151,12 @@ export interface ContextIdentifier {
 }
 export interface ContributionContext {
     containerCssClass: string;
+    contributionData: any;
     cssReferences: string[];
+    cssThemedRoot: string;
     moduleLoaderConfig: ModuleLoaderConfiguration;
-    partialContent: boolean;
     scriptModules: string[];
+    serviceLocations: ServiceLocations;
     serviceUrl: string;
 }
 export interface ContributionPath {
@@ -1806,7 +2229,7 @@ export interface HubGroup {
 }
 export interface HubsContext {
     hubGroups: HubGroup[];
-    hubGroupsContributionPointId: string;
+    hubGroupsCollectionContributionId: string;
     hubs: Hub[];
     selectedHubGroupId: string;
 }
@@ -1875,14 +2298,17 @@ export interface PageContext {
     moduleLoaderConfig: ModuleLoaderConfiguration;
     navigation: NavigationContext;
     serviceInstanceId: string;
-    serviceLocations: {
+    serviceLocations: ServiceLocations;
+    timeZonesConfiguration: TimeZonesConfiguration;
+    webAccessConfiguration: ConfigurationContext;
+    webContext: WebContext;
+}
+export interface ServiceLocations {
+    locations: {
         [key: string]: {
             [key: number]: string;
         };
     };
-    timeZonesConfiguration: TimeZonesConfiguration;
-    webAccessConfiguration: ConfigurationContext;
-    webContext: WebContext;
 }
 export interface StylesheetReference {
     highContrastUrl: string;
@@ -1910,6 +2336,7 @@ export interface TfsServiceHostDescriptor {
     hostType: any;
     id: string;
     name: string;
+    relVdir: string;
     vdir: string;
 }
 export interface TimeZonesConfiguration {
@@ -2048,6 +2475,9 @@ export var TypeInfo: {
     PageContext: {
         fields: any;
     };
+    ServiceLocations: {
+        fields: any;
+    };
     StylesheetReference: {
         fields: any;
     };
@@ -2121,315 +2551,461 @@ export function getDefaultWebContext(): Contracts_Platform.WebContext;
 export function getPageContext(): Contracts_Platform.PageContext;
 }
 declare module "VSS/Contributions/Contracts" {
-/**
-* Represents a VSO &quot;app&quot; which is a container for internal and 3rd party contributions and contribution points
-*/
-export interface App extends AppManifest {
-    /**
-    * Unique id for this app (the same id is used for all versions of a single app)
-    */
-    id: string;
-    /**
-    * Information about which store this app is published and when/by-whom it was published
-    */
-    publishInfo: AppPublishInfo;
-}
-/**
-* The state of an installed app
-*/
-export interface AppInstallationState {
-    /**
-    * Whether or not the app is currently enabled in a particular app installation
-    */
-    enabled: boolean;
-    /**
-    * The time at which this installation was last updated
-    */
-    lastUpdated: Date;
-    /**
-    * Identifier of the user who last changed the installation state (install, enable, disable, etc.)
-    */
-    lastUpdatedBy: string;
-}
-/**
-* Base class for app properties which are shared by the app manifest and the app model
-*/
-export interface AppManifest {
-    /**
-    * Uri used as base for other relative uri's defined in app
-    */
-    baseUri: string;
-    /**
-    * Dictionary of all contribution points keyed by contribution point id
-    */
-    contributionPoints: {
-        [key: string]: ContributionPoint;
-    };
-    /**
-    * Dictionary of all contributions (property bags) keyed by contribution point id
-    */
-    contributions: {
-        [key: string]: any[];
-    };
-    /**
-    * Dictionary of all contribution types keyed by contribution point type id
-    */
-    contributionTypes: {
-        [key: string]: any;
-    };
-    /**
-    * Description of the app
-    */
-    description: string;
-    /**
-    * Url to the icon to use when displaying this app
-    */
-    icon: string;
-    /**
-    * Friendly name of the app
-    */
-    name: string;
-    /**
-    * Namespace identifier for an app. For example, &quot;vss.web&quot;. This serves as a prefix in references to this app's contributions, contribution types, and contribution points.
-    */
-    namespace: string;
-    /**
-    * Information about the provider/owner of this app
-    */
-    provider: ContributionProvider;
-    /**
-    * Version of this app
-    */
-    version: string;
-}
-/**
-* Publishing information about an app
-*/
-export interface AppPublishInfo {
-    /**
-    * When the app was last updated
-    */
-    lastUpdated: Date;
-    /**
-    * Id of the user who published the app
-    */
-    ownerId: string;
-    /**
-    * Store to which the app is published
-    */
-    store: AppStore;
-}
-export interface AppSetting {
+export interface AppDataSetting {
     key: string;
     value: string;
 }
 /**
-* Store into which apps can be published
-*/
-export interface AppStore {
+ * An individual contribution made by an extension
+ */
+export interface Contribution extends ContributionBase {
     /**
-    * Type of app store
-    */
-    appStoreType: AppStoreType;
-    /**
-    * Unique identifier for this store
-    */
-    id: number;
-    /**
-    * Identifier for the target of the app store. For a developer store, for example, this is the unique user id of the developer.
-    */
-    target: string;
-}
-export enum AppStoreType {
-    /**
-    * App store type is unknown
-    */
-    Unknown = 0,
-    /**
-    * Store for builtin VSO apps
-    */
-    BuiltIn = 1,
-    /**
-    * Store for an individual app developer
-    */
-    Developer = 2,
-}
-/**
-* An individual contribution made by an app
-*/
-export interface Contribution {
-    /**
-    * The app which contributes this contribution
-    */
-    app: App;
-    /**
-    * The full contribution point id string
-    */
-    point: ContributionIdentifier;
-    /**
-    * Properties/attributes of this contribution
-    */
+     * Properties/attributes of this contribution
+     */
     properties: any;
-}
-/**
-* Identifier for contribution types and points
-*/
-export interface ContributionIdentifier {
     /**
-    * The namespace of the app that is supplying the contribution point
-    */
-    appNamespace: string;
+     * The ids of the contribution(s) that this contribution targets. (parent contributions)
+     */
+    targets: string[];
     /**
-    * The app-relative contribution point id
-    */
-    appRelativeId: string;
-    /**
-    * The full/unique identifier of the contribution point (combines app namespace and point id)
-    */
-    id: string;
-}
-/**
-* A point to which apps can make contributions
-*/
-export interface ContributionPoint extends ContributionIdentifier {
-    /**
-    * Description of this contribution point
-    */
-    description: string;
-    /**
-    * Id of the contribution type of this point
-    */
+     * Id of the Contribution Type
+     */
     type: string;
 }
 /**
-* Description about a property of a contribution type
-*/
-export interface ContributionPropertyDescription {
+ * Base class shared by contributions and contribution types
+ */
+export interface ContributionBase {
     /**
-    * Description of the property
-    */
+     * Description of the contribution/type
+     */
     description: string;
     /**
-    * Name of the property
-    */
+     * Extension-relative identifier of the contribution/type
+     */
+    id: string;
+}
+/**
+ * Identifier for contributions and contribution types
+ */
+export interface ContributionIdentifier {
+    /**
+     * The extension id
+     */
+    extensionId: string;
+    /**
+     * The full/unique identifier of the contribution/contributionType
+     */
+    id: string;
+    /**
+     * The publisher id
+     */
+    publisherId: string;
+    /**
+     * The extension-relative contribution id
+     */
+    relativeId: string;
+}
+/**
+ * A point to which extensions can make contributions
+ */
+export interface ContributionPoint extends ContributionIdentifier {
+    /**
+     * Description of this contribution point
+     */
+    description: string;
+    /**
+     * Id of the contribution type of this point
+     */
+    type: string;
+}
+/**
+ * Description about a property of a contribution type
+ */
+export interface ContributionPropertyDescription {
+    /**
+     * Description of the property
+     */
+    description: string;
+    /**
+     * Name of the property
+     */
     name: string;
     /**
-    * True if this property is required
-    */
+     * True if this property is required
+     */
     required: boolean;
     /**
-    * The type of value used for this property
-    */
+     * The type of value used for this property
+     */
     type: ContributionPropertyType;
 }
 export enum ContributionPropertyType {
     /**
-    * Contribution type is unknown (value may be anything)
-    */
+     * Contribution type is unknown (value may be anything)
+     */
     Unknown = 0,
     /**
-    * Value is a string
-    */
+     * Value is a string
+     */
     String = 1,
     /**
-    * Value is a Uri
-    */
+     * Value is a Uri
+     */
     Uri = 2,
     /**
-    * Value is a GUID
-    */
+     * Value is a GUID
+     */
     Guid = 4,
     /**
-    * Value is True or False
-    */
+     * Value is True or False
+     */
     Boolean = 8,
     /**
-    * Value is an integer
-    */
+     * Value is an integer
+     */
     Integer = 16,
     /**
-    * Value is a double
-    */
+     * Value is a double
+     */
     Double = 32,
     /**
-    * Value is a DateTime object
-    */
+     * Value is a DateTime object
+     */
     DateTime = 64,
     /**
-    * Value is a generic Dictionary/JObject/property bag
-    */
+     * Value is a generic Dictionary/JObject/property bag
+     */
     Dictionary = 128,
     /**
-    * Value is an array
-    */
+     * Value is an array
+     */
     Array = 256,
+    /**
+     * Value is an arbitrary/custom object
+     */
+    Object = 512,
 }
 /**
-* Information about the provider of an app
-*/
+ * Information about the provider of an extension
+ */
 export interface ContributionProvider {
     /**
-    * Name of the app owner/provider
-    */
+     * Name of the extension owner/provider
+     */
     name: string;
     /**
-    * Url of the app owner/provider's website
-    */
+     * Url of the extension owner/provider's website
+     */
     website: string;
 }
 /**
-* A contribution type, given by a json schema
-*/
-export interface ContributionType {
+ * A contribution type, given by a json schema
+ */
+export interface ContributionType extends ContributionBase {
     /**
-    * The app which contributes this contribution type
-    */
-    app: App;
+     * Friendly name of the contribution/type
+     */
+    name: string;
     /**
-    * Schema of this contribution type
-    */
-    schema: any;
-    /**
-    * The full contribution type identifier
-    */
-    typeIdentifier: ContributionIdentifier;
+     * Describes the allowed properties for this contribution type
+     */
+    properties: {
+        [key: string]: ContributionPropertyDescription;
+    };
 }
 /**
-* Represents a VSO app along with its installation state
-*/
-export interface InstalledApp extends App {
+ * Represents a VSO "extension" which is a container for contributions and contribution types
+ */
+export interface Extension extends ExtensionManifest {
     /**
-    * Information about this particular installation of the app
-    */
-    installState: AppInstallationState;
+     * The friendly extension id for this extension - unique for a given publisher.
+     */
+    extensionId: string;
+    /**
+     * Extension flags relevant to contribution consumers
+     */
+    flags: ExtensionFlags;
+    /**
+     * Globally unique id for this extension (the same id is used for all versions of a single extension)
+     */
+    id: string;
+    /**
+     * Unique id of the publisher of this extension
+     */
+    publisherId: string;
+    /**
+     * Unique id for this extension (the same id is used for all versions of a single extension)
+     */
+    registrationId: string;
+    /**
+     * Version of this extension
+     */
+    version: string;
+}
+/**
+ * Base class for an event callback for an extension
+ */
+export interface ExtensionEventCallback {
+    /**
+     * The uri of the endpoint that is hit when an event occurs
+     */
+    uri: string;
+}
+/**
+ * Collection of event callbacks - endpoints called when particular extension events occur.
+ */
+export interface ExtensionEventCallbackCollection {
+    /**
+     * For multi-version extensions, defines an endpoint that gets called via an OPTIONS request to determine the particular version of the extension to be used
+     */
+    versionCheck: ExtensionEventCallback;
+}
+export enum ExtensionFlags {
+    /**
+     * A built-in extension is installed for all VSO accounts by default
+     */
+    BuiltIn = 1,
+    /**
+     * The extension comes from a fully-trusted publisher
+     */
+    Trusted = 2,
+}
+/**
+ * The state of an installed extension
+ */
+export interface ExtensionInstallationState {
+    /**
+     * Whether or not the extension is currently enabled in a particular extension installation
+     */
+    enabled: boolean;
+    /**
+     * The time at which this installation was last updated
+     */
+    lastUpdated: Date;
+    /**
+     * Identifier of the user who last changed the installation state (install, enable, disable, etc.)
+     */
+    lastUpdatedBy: string;
+}
+/**
+ * Base class for extension properties which are shared by the extension manifest and the extension model
+ */
+export interface ExtensionManifest {
+    /**
+     * Uri used as base for other relative uri's defined in extension
+     */
+    baseUri: string;
+    /**
+     * List of contributions made by this extension
+     */
+    contributions: Contribution[];
+    /**
+     * List of contribution types defined by this extension
+     */
+    contributionTypes: ContributionType[];
+    /**
+     * Collection of endpoints that get called when particular extension events occur
+     */
+    eventCallbacks: ExtensionEventCallbackCollection;
+    /**
+     * Version of the extension manifest format/content
+     */
+    manifestVersion: number;
+    /**
+     * List of all oauth scopes required by this extension
+     */
+    scopes: string[];
+}
+/**
+ * Base class for extension properties which are shared by the extension manifest and the extension model
+ */
+export interface ExtensionManifestOld {
+    /**
+     * Uri used as base for other relative uri's defined in extension
+     */
+    baseUri: string;
+    /**
+     * Dictionary of all contribution points keyed by contribution point id
+     */
+    contributionPoints: {
+        [key: string]: ContributionPoint;
+    };
+    /**
+     * Dictionary of all contributions (property bags) keyed by contribution point id
+     */
+    contributions: {
+        [key: string]: any[];
+    };
+    /**
+     * Dictionary of all contribution types keyed by contribution point type id
+     */
+    contributionTypes: {
+        [key: string]: any;
+    };
+    /**
+     * Description of the extension
+     */
+    description: string;
+    /**
+     * Url to the icon to use when displaying this extension
+     */
+    icon: string;
+    /**
+     * Friendly name of the extension
+     */
+    name: string;
+    /**
+     * Namespace identifier for an extension. For example, "vss.web". This serves as a prefix in references to this extension's contributions, contribution types, and contribution points.
+     */
+    namespace: string;
+    /**
+     * Information about the provider/owner of this extension
+     */
+    provider: ContributionProvider;
+    /**
+     * Version of this extension
+     */
+    version: string;
+    /**
+     * Url used to perform version checks for an extension
+     */
+    versionCheckUrl: string;
+}
+/**
+ * Represents a VSO "extension" which is a container for internal and 3rd party contributions and contribution points
+ */
+export interface ExtensionOld extends ExtensionManifestOld {
+    /**
+     * Unique id for this extension (the same id is used for all versions of a single extension)
+     */
+    id: string;
+    /**
+     * Information about which store this extension is published and when/by-whom it was published
+     */
+    publishInfo: ExtensionPublishInfo;
+}
+/**
+ * Publishing information about an extension
+ */
+export interface ExtensionPublishInfo {
+    /**
+     * When the extension was last updated
+     */
+    lastUpdated: Date;
+    /**
+     * Id of the user who published the extension
+     */
+    ownerId: string;
+    /**
+     * Store to which the extension is published
+     */
+    store: ExtensionStore;
+}
+export enum ExtensionStateFlags {
+    /**
+     * No flags set
+     */
+    None = 0,
+    /**
+     * Extension is disabled
+     */
+    Disabled = 1,
+    /**
+     * Extension is a built in
+     */
+    BuiltIn = 2,
+    /**
+     * Extension has multiple versions
+     */
+    MultiVersion = 4,
+    /**
+     * Extension is not installed.  This is for builtin extensions only and can not otherwise be set.
+     */
+    UnInstalled = 8,
+    /**
+     * Error performing version check
+     */
+    VersionCheckError = 16,
+}
+/**
+ * Store into which extensions can be published
+ */
+export interface ExtensionStore {
+    /**
+     * Type of extension store
+     */
+    extensionStoreType: ExtensionStoreType;
+    /**
+     * Unique identifier for this store
+     */
+    id: number;
+    /**
+     * Identifier for the target of the extension store. For a developer store, for example, this is the unique user id of the developer.
+     */
+    target: string;
+}
+export enum ExtensionStoreType {
+    /**
+     * Extension store type is unknown
+     */
+    Unknown = 0,
+    /**
+     * Store for builtin VSO extensions
+     */
+    BuiltIn = 1,
+    /**
+     * Store for an individual extension developer
+     */
+    Developer = 2,
+}
+/**
+ * Represents a VSO extension along with its installation state
+ */
+export interface InstalledExtension extends Extension {
+    /**
+     * Information about this particular installation of the extension
+     */
+    installState: InstalledExtensionState;
+}
+/**
+ * The state of an installed extension
+ */
+export interface InstalledExtensionState {
+    /**
+     * States of an installed extension
+     */
+    flags: ExtensionStateFlags;
+    /**
+     * The time at which this installation was last updated
+     */
+    lastUpdated: Date;
+}
+/**
+ * Information about the extension
+ */
+export interface SupportedExtension {
+    /**
+     * Unique Identifier for this extension
+     */
+    extension: string;
+    /**
+     * Unique Identifier for this publisher
+     */
+    publisher: string;
+    /**
+     * Supported version for this extension
+     */
+    version: string;
 }
 export var TypeInfo: {
-    App: {
+    AppDataSetting: {
         fields: any;
-    };
-    AppInstallationState: {
-        fields: any;
-    };
-    AppManifest: {
-        fields: any;
-    };
-    AppPublishInfo: {
-        fields: any;
-    };
-    AppSetting: {
-        fields: any;
-    };
-    AppStore: {
-        fields: any;
-    };
-    AppStoreType: {
-        enumValues: {
-            "unknown": number;
-            "builtIn": number;
-            "developer": number;
-        };
     };
     Contribution: {
+        fields: any;
+    };
+    ContributionBase: {
         fields: any;
     };
     ContributionIdentifier: {
@@ -2453,6 +3029,7 @@ export var TypeInfo: {
             "dateTime": number;
             "dictionary": number;
             "array": number;
+            "object": number;
         };
     };
     ContributionProvider: {
@@ -2461,15 +3038,69 @@ export var TypeInfo: {
     ContributionType: {
         fields: any;
     };
-    InstalledApp: {
+    Extension: {
+        fields: any;
+    };
+    ExtensionEventCallback: {
+        fields: any;
+    };
+    ExtensionEventCallbackCollection: {
+        fields: any;
+    };
+    ExtensionFlags: {
+        enumValues: {
+            "builtIn": number;
+            "trusted": number;
+        };
+    };
+    ExtensionInstallationState: {
+        fields: any;
+    };
+    ExtensionManifest: {
+        fields: any;
+    };
+    ExtensionManifestOld: {
+        fields: any;
+    };
+    ExtensionOld: {
+        fields: any;
+    };
+    ExtensionPublishInfo: {
+        fields: any;
+    };
+    ExtensionStateFlags: {
+        enumValues: {
+            "none": number;
+            "disabled": number;
+            "builtIn": number;
+            "multiVersion": number;
+            "unInstalled": number;
+            "versionCheckError": number;
+        };
+    };
+    ExtensionStore: {
+        fields: any;
+    };
+    ExtensionStoreType: {
+        enumValues: {
+            "unknown": number;
+            "builtIn": number;
+            "developer": number;
+        };
+    };
+    InstalledExtension: {
+        fields: any;
+    };
+    InstalledExtensionState: {
+        fields: any;
+    };
+    SupportedExtension: {
         fields: any;
     };
 };
 }
 declare module "VSS/Contributions/Controls" {
-import Contributions_Contracts = require("VSS/Contributions/Contracts");
-import Contributions_Services = require("VSS/Contributions/Services");
-import Controls = require("VSS/Controls");
+import Contracts_Platform = require("VSS/Common/Contracts/Platform");
 /**
 * Common interface between internal and external contribution hosts
 */
@@ -2482,6 +3113,12 @@ export interface IExtensionHost {
     * @return Promise that is resolved to the instance (or a proxy object that talks to the instance in the iframe case)
     */
     getRegisteredInstance<T>(instanceId: string, contextData?: any): IPromise<T>;
+    /**
+    * Handle an extension being reused by a different contribution that points to the same endpoint (for pooled extension hosts)
+    *
+    * @param contribution The contribution causing the extension to be reused
+    */
+    reuseHost(contribution: IExtensionContribution): any;
 }
 /**
 * Options for contribution host controls
@@ -2492,9 +3129,9 @@ export interface ContributionHostOptions {
     */
     uri: string;
     /**
-    * The app that is contributing the content
+    * The contribution that is initially causing the extension to load
     */
-    app: Contributions_Contracts.App;
+    contribution: IExtensionContribution;
     /**
     * If undefined, perform a GET request to obtain the iframe content. If postContent is specified it will be POST'ed to the child iframe url
     */
@@ -2518,138 +3155,40 @@ export interface ExternalContentHostOptions extends ContributionHostOptions {
     slowLoadWarningDuration?: number;
 }
 /**
-* A control that hosts external content via iframe
+* Instantiate a contributed control through an internal or external contribution host.
+*
+* @param $container The jQuery element to place the control in
+* @param uri The uri of the contribution content
+* @param contributionId Id of the contribution which contains the details of the contributed control
+* @param initialConfig Initial configuration/options to pass to the control
+* @param postContent Optional data to post to the contribution url (if not specified, a GET is performed)
+* @param uriReplacementProperties Replacement object to use when resolving the content uri
+* @param uriPropertyName Name of the uri property to lookup in the contribution's properties
+* @param webContext The web context to use when fetching contributions and resolving uris
+* @param iframeFirstPartyContent: Set to true if the content should be iframed, even if it is first-party content.
+* @return IExtensionHost
 */
-export class ExternalContentHost extends Controls.Control<ExternalContentHostOptions> implements IExtensionHost {
-    static DEFAULT_SLOW_LOAD_DURATION: number;
-    static MAX_WAIT_FOR_LOADED_EVENT: number;
-    static Events: {
-        EXTENSION_LOAD_FAILED: string;
-        SLOW_LOAD_WARNING: string;
-        EXTENSION_MESSAGE_RESIZED: string;
-    };
-    private _xdmChannel;
-    private _$container;
-    private _$iframe;
-    private _iframeId;
-    private _receivedLoadedEvent;
-    private _loadFailed;
-    private _loadedDeferred;
-    private _$statusContainer;
-    private _statusControl;
-    private _messageArea;
-    constructor(options?: ExternalContentHostOptions);
-    /**
-    * Gets the jQuery element of the iframe being hosted
-    */
-    private getIFrame();
-    /**
-    * Gets the jQuery element of the iframe being hosted
-    */
-    private getWindow();
-    /**
-    * Gets the XDM channel used to communicate with the child iframe
-    */
-    private getXdmChannel();
-    /**
-    * Initialize the XDM channel if we haven't already done so
-    */
-    private ensureXdmChannelIntialized();
-    initialize(): void;
-    private _showExtensionMessage(messageType, messageTitle, messageContentHtml, messageIsFromExtension, expandDetails);
-    private _handleLoadError(errorMessage);
-    private _hideLoadingIndicator();
-    private _handleLoaded();
-    /**
-    * Get an instance of a registered object in an extension
-    *
-    * @param instanceId Id of the instance to get
-    * @param contextData Optional data to pass to the extension for it to use when creating the instance
-    * @return Promise that is resolved to the instance (or a proxy object that talks to the instance in the iframe case)
-    */
-    getRegisteredInstance<T>(instanceId: string, contextData?: any): IPromise<T>;
-    /**
-    * Execute a method in the child iframe
-    *
-    * @param methodName Name of the RPC method to invoke via XDM
-    * @param params Arguments to pass to the method
-    */
-    invokeMethod(methodName: string, params?: any[]): IPromise<any>;
-    /**
-     * Get the host control object which the VSS.SDK can interact with to
-     * for initial handshake, resizinig, etc.
-     */
-    private getHostControl();
-}
-/**
-* A control that hosts internal content by injecting it into the parent DOM
-*/
-export class InternalContentHost extends Controls.Control<ContributionHostOptions> implements IExtensionHost {
-    private _$contentContainer;
-    private _loadedDeferred;
-    constructor(options?: ContributionHostOptions);
-    initialize(): void;
-    /**
-    * Get an instance of a registered object in an extension
-    *
-    * @param instanceId Id of the instance to get
-    * @param contextData Optional data to pass to the extension for it to use when creating the instance
-    * @return Promise that is resolved to the instance (or a proxy object that talks to the instance in the iframe case)
-    */
-    getRegisteredInstance<T>(instanceId: string, contextData?: any): IPromise<T>;
-    private handleContentReceived(content);
-}
+export function createExtensionHost($container: JQuery, contributionId: string, initialConfig?: any, postContent?: any, uriReplacementProperties?: any, uriPropertyName?: string, webContext?: Contracts_Platform.WebContext, iframeFirstPartyContent?: boolean): IPromise<IExtensionHost>;
 /**
 * Instantiate a contributed control through an internal or external contribution host.
 *
 * @param $container The jQuery element to place the control in
+* @param uri The uri of the contribution content
 * @param contribution The contribution which contains the details of the contributed control
-* @param url The url of the contribution content
 * @param initialConfig Initial configuration/options to pass to the control
 * @param postContent: Optional data to post to the contribution url (if not specified, a GET is performed)
-* @param usePooledBackgroundHost: Set to true if the host will not be shown in the UI and we want to re-use an existing pooled host that points to the same endpoint.
+* @param iframeFirstPartyContent: Set to true if the content should be iframed, even if it is first-party content.
 * @return IExtensionHost
 */
-export function createExtensionHost<TControlInterface>($container: JQuery, uri: string, contribution: Contributions_Services.Contribution, initialConfig?: any, postContent?: any): IExtensionHost;
+export function createExtensionHostForContribution($container: JQuery, uri: string, contribution: IExtensionContribution, initialConfig?: any, postContent?: any, iframeFirstPartyContent?: boolean): IExtensionHost;
 /**
 * Instantiate a contributed control through an internal or external contribution host.
 *
 * @param contribution The contribution which contains the details of the contributed control
-* @param url The url of the contribution content
+* @param uri The uri of the contribution content
 * @return IExtensionHost
 */
-export function getBackgroundHost<TControlInterface>(uri: string, contribution: Contributions_Services.Contribution): IExtensionHost;
-/**
- * Manages a pool of hosts (iframes) used for making RPCs to various app implementations
- */
-export class BackgroundHostPool {
-    private _hostsContainer;
-    private _hosts;
-    constructor();
-    /**
-     * Retrieve the container that background host iframes live in
-     * @return JQuery
-     */
-    private getHostsContainer();
-    /**
-    * Gets an AppHost for the given contribution. May re-use old hosts,
-    * return an existing host for this contribution, or create a new one.
-    *
-    * @param Contribution_Services.Contribution
-    * @param initialConfig Initial configuration/options to pass to the host control (ignored if using a cached host)
-    * @param postContent: Optional data to post to the contribution url. If not specified, a GET is performed. (ignored if using a cached host)
-    * @return AppHost
-    */
-    getHost(uri: string, contribution: Contributions_Services.Contribution, initialConfig?: any, postContent?: any): ExternalContentHost;
-    /**
-     * Creates a new host that is hidden in the UI (for RPCs)
-     */
-    private createBackgroundHost(uri, contribution, initialConfig?, postContent?);
-}
-/**
-* Default pool of background (non-UI) external host/iframes used for communicating with extensions
-*/
-export var backgroundHostPool: BackgroundHostPool;
+export function getBackgroundHost(uri: string, contribution: IExtensionContribution): IExtensionHost;
 }
 declare module "VSS/Contributions/RestClient" {
 import Contracts = require("VSS/Contributions/Contracts");
@@ -2657,549 +3196,228 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class ContributionsHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {string} appStoreId
      * @param {string} appId
-     * @return IPromise<Contracts.App>
+     * @return IPromise<Contracts.ExtensionOld>
      */
-    getApp(appStoreId: string, appId: string): IPromise<Contracts.App>;
+    getApp(appStoreId: string, appId: string): IPromise<Contracts.ExtensionOld>;
     /**
+     * [Preview API]
+     *
      * @param {string} appStoreId
-     * @return IPromise<Contracts.App[]>
+     * @return IPromise<Contracts.ExtensionOld[]>
      */
-    getApps(appStoreId: string): IPromise<Contracts.App[]>;
+    getApps(appStoreId: string): IPromise<Contracts.ExtensionOld[]>;
     /**
-     * @param {Contracts.AppManifest} app
+     * [Preview API]
+     *
+     * @param {Contracts.ExtensionManifestOld} app
      * @param {string} appStoreId
-     * @return IPromise<Contracts.App>
+     * @return IPromise<Contracts.ExtensionOld>
      */
-    publishApp(app: Contracts.AppManifest, appStoreId: string): IPromise<Contracts.App>;
+    publishApp(app: Contracts.ExtensionManifestOld, appStoreId: string): IPromise<Contracts.ExtensionOld>;
     /**
+     * [Preview API]
+     *
      * @param {string} appStoreId
      * @param {string} appId
      * @return IPromise<void>
      */
     removeApp(appStoreId: string, appId: string): IPromise<void>;
     /**
-     * @param {string} appId
-     * @return IPromise<Contracts.InstalledApp>
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @return IPromise<Contracts.InstalledExtension>
      */
-    getInstalledApp(appId: string): IPromise<Contracts.InstalledApp>;
+    getInstalledExtension(extensionId: string): IPromise<Contracts.InstalledExtension>;
     /**
-     * @param {string[]} contributionPointIdFilter
+     * [Preview API]
+     *
+     * @param {string[]} contributionIds
      * @param {boolean} includeDisabledApps
-     * @return IPromise<Contracts.InstalledApp[]>
+     * @return IPromise<Contracts.InstalledExtension[]>
      */
-    getInstalledApps(contributionPointIdFilter?: string[], includeDisabledApps?: boolean): IPromise<Contracts.InstalledApp[]>;
+    getInstalledExtensions(contributionIds?: string[], includeDisabledApps?: boolean): IPromise<Contracts.InstalledExtension[]>;
     /**
-     * @param {Contracts.InstalledApp} appToInstall
-     * @return IPromise<Contracts.InstalledApp>
+     * [Preview API]
+     *
+     * @param {Contracts.InstalledExtension} extensionToInstall
+     * @return IPromise<Contracts.InstalledExtension>
      */
-    installApp(appToInstall: Contracts.InstalledApp): IPromise<Contracts.InstalledApp>;
+    installExtension(extensionToInstall: Contracts.InstalledExtension): IPromise<Contracts.InstalledExtension>;
     /**
-     * @param {string} appId
+     * [Preview API]
+     *
+     * @param {string} extensionId
      * @return IPromise<void>
      */
-    unInstallApp(appId: string): IPromise<void>;
+    unInstallExtension(extensionId: string): IPromise<void>;
     /**
-     * @param {Contracts.InstalledApp} app
-     * @param {string} appId
-     * @return IPromise<Contracts.InstalledApp>
+     * [Preview API]
+     *
+     * @param {Contracts.InstalledExtension} extension
+     * @param {string} extensionId
+     * @return IPromise<Contracts.InstalledExtension>
      */
-    updateInstalledApp(app: Contracts.InstalledApp, appId?: string): IPromise<Contracts.InstalledApp>;
+    updateInstalledExtension(extension: Contracts.InstalledExtension, extensionId?: string): IPromise<Contracts.InstalledExtension>;
     /**
-     * @param {string} appId
-     * @param {string} key
-     * @return IPromise<Contracts.AppSetting>
-     */
-    getAppData(appId: string, key: string): IPromise<Contracts.AppSetting>;
-    /**
-     * @param {Contracts.AppSetting} setting
+     * [Preview API]
+     *
      * @param {string} appId
      * @param {string} key
-     * @return IPromise<Contracts.AppSetting>
+     * @return IPromise<Contracts.AppDataSetting>
      */
-    updateAppData(setting: Contracts.AppSetting, appId: string, key: string): IPromise<Contracts.AppSetting>;
+    getAppData(appId: string, key: string): IPromise<Contracts.AppDataSetting>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.AppDataSetting} setting
+     * @param {string} appId
+     * @param {string} key
+     * @return IPromise<Contracts.AppDataSetting>
+     */
+    updateAppData(setting: Contracts.AppDataSetting, appId: string, key: string): IPromise<Contracts.AppDataSetting>;
 }
 }
 declare module "VSS/Contributions/Services" {
 import Contributions_Contracts = require("VSS/Contributions/Contracts");
+import Service = require("VSS/Service");
 export module CustomerIntelligenceConstants {
     var CONTRIBUTIONS_AREA: string;
     var CONTRIBUTIONS_USAGE_FEATURE: string;
     var CONTRIBUTIONS_ACTION: string;
     var CONTRIBUTIONS_ACTION_EXECUTE: string;
 }
-export enum ContributionAttributeDataType {
-    String = 0,
-    Number = 1,
-    Boolean = 2,
-    Array = 3,
-    Function = 4,
-}
-export interface IContributionPoint {
-    description: string;
-    type: string;
-}
-export interface IContributionTypes {
-    [typeName: string]: IContributionType;
-}
-export interface IContributionType {
-    description: string;
-    parentType?: string;
-    attributes: IContributionTypeAttribute[];
-}
-export interface IContributionTypeAttribute {
-    name: string;
-    description: string;
-    required?: boolean;
-    type: string;
-    validValues?: IAttributeValidValue[];
-    attributes?: IContributionTypeAttribute[];
-}
-export interface IAttributeValidValue {
-    name: string;
-}
-/********************/
-/*** Apps classes ***/
-/********************/
 /**
- * Represents a Registered App, which encapsulates contributions
+ * Manages all RegisteredExtension instances and their contributions.
  */
-export class RegisteredApp {
-    private _contributions;
-    private _app;
-    /**
-     * Namespace of the app, e.g. vss.code.web
-     */
-    namespace: string;
-    /**
-     * Indicates if this app was generated from loading an app from the client's localhost
-     */
-    isDevApp: boolean;
-    /**
-     * Indicates this app has been initialized with data. The constructor doesn't require
-     * all app info so that references can be made to this object before the data is loaded.
-     */
-    initialized: boolean;
-    /**
-     * Non-initializing constructor
-     * @param namespace Namepsace of the app (e.g. vss.code.ui)
-     * @param isDevApp True if this app is being created by dev mode.
-     */
-    constructor(namespace: string, isDevApp?: boolean);
-    /**
-     * Initialize this app with the given App object
-     * @param Contributionscommon.App The app that is registered
-     */
-    initialize(app: Contributions_Contracts.App): void;
-    /**
-     * Returns the underlying app data structure
-     * @returns Contributions_Contracts.App The underlying App iff this RegisteredApp has been initialize()'d
-     * @throws Error if this RegisteredApp has not been initialized.
-     */
-    app(): Contributions_Contracts.App;
-    /**
-     * Add contributions for this app to previously unpopulated contribution point ids.
-     *
-     * @param contributions key-value-pair pointing contribution point id to the Contribution
-     * @return Contribution[] flat list of contributions added
-     */
-    updateContributions(contributions: IDictionaryStringTo<IDictionaryStringTo<any>[]>): Contribution[];
-    /**
-     * Get the contributions from this app, optionally filtered by the given contribution point ids.
-     * If no contributions are found, return an empty list.
-     */
-    getContributions(pointIds?: string[]): Contribution[];
-}
-/**
- * Manages all RegisteredApp instances and their contributions.
- */
-export class AppRegistry {
-    private _apps;
-    private static _instance;
-    private _contributionsClient;
-    private _contributionsByPointId;
-    private _contributionsByAppNamespace;
-    private _loadedContributionPoints;
-    private _loadedAppNamespaces;
-    private _contributionQueryPromises;
+export class ExtensionService extends Service.VssService {
     private static _featureEnabled;
+    private _extensions;
+    private _contributionsClient;
+    private _contributionsById;
+    private _contributionsByTargetId;
+    private _loadedContributionTargets;
+    private _contributionQueryPromises;
+    private static _legacyContributionIdMap;
     /**
      * Private constructor - do not call.
      */
     constructor();
     /**
-     * Get the singleton instance (create if it doesn't exist) of this class
-     * @return AppRegistry
+     * Ensures the page's Json Island has been processed if web context is the default
+     * Should be called by the Service factory.
+     * @param connection Service.VssConnection
      */
-    static getInstance(): AppRegistry;
-    private registerAppNamespace(namespace, isDevApp?);
-    private addRegisteredApp(app);
+    initializeConnection(connection: Service.VssConnection): void;
     /**
-     * Register an application so that its contributions can be queried
-     * @param app Contributions_Contracts.AppManifest The manifest of the app to register (App may also be provided; it is type-compatible with AppManifest)
-     * @return RegisteredApp The resulting app object
+     * Given an extension, creates Contribution objects that can be quickly
+     * looked up, and also have a reference back to the extension.
      */
-    registerApp(app: Contributions_Contracts.App): RegisteredApp;
+    private _ensureContributionLookups(extension);
     /**
-     * Gets a list of contributions (from all installed apps) to the given point names.
-     * @param pointIds Contribution point ids
-     * @param refresh (null) True to force re-fetch of contributions, false to ensure no server calls, null to make server calls for any unfulfilled point ids.
-     * @return JQueryPromise<Contribution[]> Promise that is resolved when contributions are available.
+     * Register an extension
+     * @param extension Contributions_Contracts.InstalledExtension The extension to register.
      */
-    beginGetContributions(pointIds: string[], refresh?: boolean): IPromise<Contribution[]>;
+    registerExtension(extension: Contributions_Contracts.InstalledExtension): void;
     /**
-    * Fetch a contribution by metadata about the contribution to get (point id, contribution id, extension id).
-    *
-    * @param contributionInfo IContribution which specifies information about the Contribution to get
-    * @param failOnDuplicateMatches If true, reject the promise if more than one contribution matches the given query. Otherwise the first match is returned.
-    */
-    getContribution(contributionInfo: IContribution, failOnDuplicateMatches?: boolean): IPromise<Contribution>;
-    private _getUnqueriedContributionPoints(pointIds);
-    private _getPendingLoadPromises(pointIds);
-    private _getLoadedContributionsByPointId(pointIds);
-    /**
-     * Mark the given contribution point ids as already queried-for so that additional gets
-     * for these contributions don't issue another REST call.
-     * @param pointIds Contribution point ids
+     * Get the contribution with the given id.
+     *
+     * @param id Full id of the contribution to fetch
+     * @return IPromise<IExtensionContribution>
      */
-    private _registerLoadedContributionIds(pointIds);
+    getContribution(id: string): IPromise<IExtensionContribution>;
     /**
-     * Check that an app exists with the given namespace
-     * @param namespace The namespace of the app being searched for
-     * @return boolean True if the registry contains this app, false otherwise.
+     * Gets the contributions that target the given contribution ids
+     *
+     * @param targetIds Ids of the targeted contribution(s)
+     * @return IPromise<IExtensionContribution[]> Promise that is resolved when contributions are available.
      */
-    containsApp(namespace: string): boolean;
+    getContributionsForTarget(targetId: string): IPromise<IExtensionContribution[]>;
     /**
-     * Gets the app from the registry with the given name.
-     * @param namespace Namespace of the app (e.g. vss.code.web)
-     * @param createIfNotExists Only used if the app needs to be created: true to specify that it is a dev app (e.g. using dev mode)
-     * @return RegisteredApp The app that was found matching the namespace, or the one that was just created.
+     * Gets the contributions that target the given contribution ids
+     *
+     * @param targetIds Ids of the targeted contribution(s)
+     * @return IPromise<IExtensionContribution[]> Promise that is resolved when contributions are available.
      */
-    getApp(namespace: string, createIfNotExists?: boolean): RegisteredApp;
+    getContributionsForTargets(targetIds: string[]): IPromise<IExtensionContribution[]>;
     /**
-     * Parse the apps in the JSON island given by the selector
+     * Gets contributions for the given contribution ids.
+     *
+     * @param ids Ids of the targeted contribution(s)
+     * @param includeTargets True to include the contributions with the specified ids
+     * @param includeChildren True to include contributions that target the specified ids
+     * @param refresh If true, query the server for updated contributions. If false, use already-fetched contribution data if available.
+     * @return IPromise<IExtensionContribution[]> Promise that is resolved when contributions are available.
+     */
+    getContributions(ids: string[], includeTargets: boolean, includeChildren: boolean, refresh?: boolean): IPromise<IExtensionContribution[]>;
+    private _getUnqueriedContributions(ids);
+    private _getPendingLoadPromises(ids);
+    private _getLoadedContributions(ids, includeTargets, includeChildren);
+    /**
+     * Mark the given contribution ids as already queried-for so that additional gets
+     * for these contributions don't issue a REST call.
+     */
+    private _registerLoadedContributionTargets(contributions);
+    /**
+     * Parse the extensions in the JSON island given by the selector
      * @param selector Selector to match a script tag containing JSON
      */
-    static processJsonIsland(selector: string): void;
+    private _processJsonIsland();
     /**
      * Determines if the Contribution feature is enabled (lazy)
      * @return boolean
      */
-    static featureEnabled(): boolean;
+    private static featureEnabled();
 }
-/************************************/
-/*** Contribution-related classes ***/
-/************************************/
 /**
- * Represents a contributed unit to a single extensibility point
+ * Provides helper functions for extensions-related types.
  */
-export class Contribution {
+export class ExtensionHelper {
     private static _httpUrlRegex;
     private static _handlebarHelpersRegistered;
     private static _asyncReplacementIndicator;
     private static _asyncReplacementCounter;
     private static _asyncReplacementPromises;
-    /**
-     * The properties that fulfill this contribution's type
-     */
-    /** PROTECTED **/
-    _definition: IDictionaryStringTo<any>;
-    _app: RegisteredApp;
-    /**
-     * The ContributionPoint this Contribution applies to
-     */
-    targetPoint: ContributionPoint;
-    /**
-
-     */
-    constructor(contributionPoint: string, definition: IDictionaryStringTo<any>, app: string);
-    /**
-     * Get the specified property of this contribution
-     * Optional type parameter to specify the output data type
-     * @typeparam T
-     * @param string Name of the property to get
-     * @param T Default value in case property does not exist on this contribution.
-     * @return T
-     */
-    getProperty<T>(propName: string, defaultValue?: T): T;
-    /**
-    * Get a lookup of all contribution properties
-    */
-    getProperties(): IDictionaryStringTo<any>;
-    /**
-    * Gets a non-templated uri property. It will be resolved with the base url of the extension.
-    * @param propName Name of the property containing the uri
-    */
-    getUriProperty(propName: string): string;
-    /**
-     * Gets the requested property value with templated strings filled in by values in the given object
-     * @param string The name of the property to get
-     * @param any Object containing key-value pairs to replace the template strings
-     * @return JQueryPromise<string> Promise that will be resolved with the value of the property after replacements are made.
-     */
-    beginGetTemplateProperty(propertyName: string, replacementObject: any): IPromise<string>;
-    /**
-     * Gets the requested property value with templated strings filled in by values in the given object.  It will
-     * attempt to append on baseUrl property if it is available and it is needed.
-     * @param string The name of the property to get
-     * @param any Object containing key-value pairs to replace the template strings
-     * @return JQueryPromise<string> Promise that will be resolved with the value of the property after replacements are made.
-     */
-    beginGetTemplateUriProperty(propertyName: string, replacementObject: any): IPromise<string>;
-    private _processTemplate(propertyValue, replacementObject);
-    private handleAsyncReplacements(value, asyncIndex, asyncStopIndex, deferred);
-    /**
-     * Returns
-     * @return string
-     */
-    private _processUriProperty(path);
-    /**
-     * Returns whether or not this contribution comes from dev mode
-     * @return boolean
-     */
-    isDevModeContribution(): boolean;
-    /**
-     * Gets the namespace of the app that contributed this contribution
-     * @return string
-     */
-    getAppNamespace(): string;
-    /**
-     * Gets the RegisteredApp that contributed this contribution
-     * @return RegisteredApp
-     */
-    getApp(): RegisteredApp;
-    publishTraceData(data?: string): void;
+    static getFullContributionId(contribution: IExtensionContribution): string;
     private static _registerHandlebarHelpers(handlebars);
-}
-/**
- * Represents a contribution point that will host other contributions
- */
-export class ContributionPoint {
+    private static handleAsyncReplacements(value, asyncIndex, asyncStopIndex, deferred);
     /**
-     * Name of this contribution point (without app name)
+     * Processes a mustache template string with the given replacement object
+     * @param string templateString The mustache template string
+     * @param any replacementObject
+     * @return string The template string with all replacements made
      */
-    name: string;
+    static resolveTemplateString(templateString: string, replacementObject: any): IPromise<string>;
     /**
-     * Description of contribution point (optional)
+     * Processes a URI template string with the given replacement object and base URI
+     * @param string templateString The mustache template string
+     * @param any replacementObject
+     * @param string baseUri
+     * @return string The template string with all replacements made
      */
-    description: string;
+    static resolveUriTemplate(templateString: string, replacementObject: any, baseUri: string): IPromise<string>;
     /**
-     * Type of contributions that are accepted here
+     * Get an absolute URI for a given property on a contribution and a replacements object
+     * @param
      */
-    contributionType: ContributionType;
+    static resolveUriTemplateProperty(contribution: IExtensionContribution, replacementObject: any, propertyName?: string): IPromise<string>;
     /**
-     * Reference to the app that exposes this contribution point.
-     */
-    hostingApp: RegisteredApp;
-    /**
-     * ContributionPoint constructor
-     * @param string Contribution point name, or, if appNamespace is not specified, contribution point id (app.namespace#point.name)
-     * @param string Type of contribution (as string)
-     * @param string app namespace, if not specified in the first parameter.
-     */
-    constructor(name: string, appNamespace?: string);
-    /**
-     * Gets the fullly qualified name of this contribution point (e.g. app.namespace#point.name)
+     * Given a path and a base URI, construct an absolute URI
+     * @param string path
+     * @param string baseUri
      * @return string
      */
-    getFullName(): string;
+    private static processUri(path, baseUri);
     /**
-     * Gets the fully-qualified contribution point name
-     * @param string Name of the contribution point
-     * @param string Name of the app that is hosting it
-     * @return string e.g. App.Name#Contribution.Point.Name
+     * Publish tracing data for a given contribution
+     * @param IExtensionContribution contribution
+     * @param any data
      */
-    static composeContributionPointName(pointName: string, hostApp?: string): string;
-    /**
-     * Gets the raw point name from the given point name (either fully qualified or not)
-     * @param string Point name
-     * @return string e.g. Contribution.Point.Name
-     */
-    static stripAppNamespace(pointName: string): string;
-    /**
-     * Gets the name of the app from a full point name (app.namespace#point.name)
-     * @param string Full point name
-     * @return string e.g. App.namespace
-     */
-    static stripPointName(pointName: string): string;
-}
-/**
- * Manages all the instances of ContributionPoint
- */
-export class ContributionPointRegistry {
-    private static _instance;
-    private _contributionPoints;
-    /**
-     * Private constructor - do not call.
-     */
-    constructor();
-    /**
-     * Get the singleton instance (create if it doesn't exist) of this class
-     * @return ContributionPointRegistry
-     */
-    static getInstance(): ContributionPointRegistry;
-    /**
-     * Determines if the given point has been registered.
-     * @param string Name of the contribution point (fully-qualified or just the point name)
-     * @param string? Name of the host app if the first parameter is not the fully-qualified name
-     */
-    containsPoint(name: string, hostApp?: string): boolean;
-    private registerContributionPointName(contributionPoint, appName);
-    private addPointToRegistry(contributionPoint);
-    /**
-     * Register a contribution point.
-     * The idea is to loop through all the JSON ContributionPoints and call ContributionPointRegistry.register...() on each.
-     * @param IContributionPoint the point to register, lifted from the manifest file.
-     * @param string the name of the app that is exposing this contribution point.
-     * @return ContributionPoint The ContributionPoint that was registered, null if nothing got registered.
-     */
-    registerContributionPoint(name: string, contributionPoint: IContributionPoint, appName?: string): ContributionPoint;
-    registerContributionPoints(fullPointNames: string[]): void;
-    /**
-     * Gets the contribution point for the given name and optionally hostapp.
-     * @param string Name of the contribution point (fully qualified if hostApp not provided)
-     * @param string? Name of the hosting app
-     * @param boolean If true, create the point and register it.
-     * @return ContributionPoint The point that was found (or just created)
-     */
-    getContributionPoint(name: string, hostApp?: string, createIfNotExists?: boolean): ContributionPoint;
-}
-/**
- * Represents a type of contribution, used for validation
- */
-export class ContributionType {
-    private _attributes;
-    /**
-     * Name of the contribution type
-     */
-    name: string;
-    /**
-     * Description of its purpose
-     */
-    description: string;
-    /**
-     * Type to extend (parent attributes are inherited)
-     */
-    parentType: ContributionType;
-    /**
-     * True iff this type is initialized and ready to be used for validation
-     */
-    initialized: boolean;
-    /**
-     * ContributionType constructor
-     * @param string Name of the contribution type
-     */
-    constructor(name: string);
-    /**
-     * Initialize this contribution type
-     * @param string Description of this type
-     * @param string Reference to the parent type
-     * @param IContributionAttribute[] List of unique attributes of this contribution type
-     */
-    initialize(description?: string, parentType?: string, attributes?: IContributionTypeAttribute[]): void;
-    /**
-     * Get the attributes on this contribution type
-     * @param boolean (true) True to include attributes from inherited types
-     * @return IDictionaryStringTo<ContributionTypeAttribute> Dictionary of attributes
-     */
-    getAttributes(includeInherited?: boolean): IDictionaryStringTo<ContributionTypeAttribute>;
-    /**
-     * Return the attribute with the given name. Looks through inherited types as well.
-     * @param The name of the attribute to find
-     * @return ContributionTypeAttribute The attribute with the given name. Null if not found.
-     */
-    getAttribute(attrName: string): ContributionTypeAttribute;
-}
-/**
- * Manages all the instances of ContributionType
- */
-export class ContributionTypeRegistry {
-    private static _instance;
-    private _types;
-    /**
-     * Private constructor - do not call
-     */
-    constructor();
-    /**
-     * Get the singleton instance (create if it doesn't exist) of this class
-     * @return ContributionTypeRegistry
-     */
-    static getInstance(): ContributionTypeRegistry;
-    private registerContributionTypeName(contributionTypeName);
-    private addTypeToRegistry(contributionType);
-    /**
-     * Create a ContributionType based on the given IContributionType and register it.
-     * @param string Name of the contribution type
-     * @param IContributionType Type from the manifest
-     * @return ContributionType The object that was created/registered.
-     */
-    registerContributionType(name: string, contributionType: IContributionType): ContributionType;
-    /**
-     * Determines if the given type name is in the registry
-     * @return boolean
-     */
-    containsType(typeName: string): boolean;
-    /**
-     * Gets the contribution type from the registry specified by the typeName
-     * @param string Name of the contribution type
-     * @param boolean True to create the type and register it if it is not already in the registry.
-     */
-    getType(typeName: string, createIfNotExists?: boolean): ContributionType;
-}
-/**
- * Represents a single attribute for a contribution type
- */
-export class ContributionTypeAttribute {
-    /**
-     * Name of the attribute
-     */
-    name: string;
-    /**
-     * Description of the attribute's purpose
-     */
-    description: string;
-    /**
-     * Specifies whether or not the attribute is required or optional on contributions of this type
-     */
-    required: boolean;
-    /**
-     * Data type of the attribute's value
-     */
-    type: ContributionAttributeDataType;
-    /**
-     * Constructor
-     * @param string Attribute name
-     * @param string Attribute description
-     * @param boolean Required attribute
-     * @param string Attribute type
-     */
-    constructor(name: string, description: string, required: boolean, type: string);
-    /**
-     * Convert an attribute type string to the enum value
-     * @param string Data type as a string
-     * @return ContributionTypeAttribute
-     */
-    static stringToDataType(str: string): ContributionAttributeDataType;
-}
-export class ManifestManager {
-    private static _instance;
-    private _isDevMode;
-    private _devport;
-    constructor();
-    static getInstance(): ManifestManager;
-    isDevMode(): boolean;
-    /**
-     * Check to see if we should try and load a manifest from a local development server.  Two locations are checked.
-     * First look for vsodevmode query string parameter.  If that is set to true we will attempt to load a local manifest.
-     * If query string paramter does not exist, then look in session storage to see if has already been set for this session.
-     */
-    private checkDevMode();
-    private _removeDevPort();
-    private _storeDevPort(port);
-    private _getDevPort();
-    checkForContributions(): void;
-    private beginGetDevelopmentIntegrations();
+    static publishTraceData(contribution: IExtensionContribution, data?: string): void;
 }
 }
 declare module "VSS/Controls" {
@@ -4543,13 +4761,6 @@ export class Splitter extends Controls.BaseControl {
      * Checks if the splitter is marked as collapsed.
      */
     private _isCollapsed();
-    /**
-     * Handles the keyup event for the toggle button.
-     *
-     * @param e
-     * @return
-     */
-    private _onToggleButtonKeyup(e?);
     /**
      * Handles the keyup event for the document.
      *
@@ -6164,7 +6375,7 @@ export class EditableGrid extends Grids.GridO<any> {
     private _calculateHeightForUpperContentSpacer(firstVisibleIndex, firstVisibleIndexTop);
     private _calculateHeightForLowerContentSpacer(lastVisibleIndex, lastVisibleIndexTop, totalHeight);
     _getOuterRowHeight(index: number): number;
-    _addSpacingElements(): void;
+    protected _addSpacingElements(): void;
     getSelectedCellIntoView(): boolean;
     _getVisibleRowIndices(): {
         first: number;
@@ -6250,7 +6461,7 @@ export class EditableGrid extends Grids.GridO<any> {
 }
 declare module "VSS/Controls/FileInput" {
 import Controls = require("VSS/Controls");
-import Utils_Core = require("VSS/Utils/Core");
+import Utils_File = require("VSS/Utils/File");
 /**
 * Options for the file input control.
 */
@@ -6273,7 +6484,7 @@ export interface FileInputControlResult {
     size: number;
     lastModifiedDate: Date;
     content?: string;
-    encoding?: Utils_Core.FileUtils.FileEncoding;
+    encoding?: Utils_File.FileEncoding;
 }
 export enum FileInputControlContentType {
     Base64EncodedText = 0,
@@ -6328,6 +6539,10 @@ export class FileInputControl extends Controls.Control<FileInputControlOptions> 
     getFiles(): FileInputControlResult[];
     isLoadInProgress(): boolean;
     getRows(): FileInputControlRow[];
+    /**
+    * Clear all files in the list.
+    */
+    clear(): void;
 }
 export interface FileDropTargetOptions {
     filesDroppedCallback: (fileList: FileList) => any;
@@ -6347,6 +6562,123 @@ export class FileDropTarget extends Controls.Enhancement<FileDropTargetOptions> 
     private _handleDragEvent(e);
     private _handleDragLeaveEvent(e);
     private _handleDropEvent(e);
+}
+}
+declare module "VSS/Controls/FormInput" {
+import Controls = require("VSS/Controls");
+import Controls_Common = require("VSS/Controls/Common");
+import FormInput_Contracts = require("VSS/Common/Contracts/FormInput");
+/**
+* Options for the file input control.
+*/
+export interface FormInputControlOptions {
+    inputsViewModel: InputsViewModel;
+    headerLabel: string;
+    comboControlMap: {
+        [key: string]: Controls_Common.Combo;
+    };
+}
+export class FormInputControl extends Controls.Control<FormInputControlOptions> {
+    static createControl($container: JQuery, options: FormInputControlOptions): FormInputControl;
+    initializeOptions(options?: any): void;
+    initialize(): void;
+    private _createInputField(inputViewModel, $parent, comboControlMap);
+    private static _fixLinkTargets(element);
+    static getProgressIconForInput(inputId: string): JQuery;
+    static getValidationIconForInput(inputId: string): JQuery;
+}
+export class FormInputViewModel {
+    protected _inputsViewModels: {
+        [key: string]: InputsViewModel;
+    };
+    protected _dependentInputsLoadingCallback: any;
+    protected _dependentInputsLoadedCallback: any;
+    protected _inputValidChangedCallback: any;
+    protected _inputValuesChangedCallback: any;
+    protected _queryForValuesCallback: any;
+    protected _isDirty: boolean;
+    mapInputIdToComboControl: {
+        [key: string]: Controls_Common.Combo;
+    };
+    constructor(dependentInputsLoadingCallback: any, dependentInputsLoadedCallback: any, inputValidChangedCallback: any, inputValuesChangedCallback: any, queryForValuesCallback?: any);
+    addInputsViewModel(key: string, inputsViewModel: InputsViewModel): void;
+    isDirty(): boolean;
+    inputsAreValid(inputsKey: string): boolean;
+    queryInputValues(inputsViewModel: InputsViewModel, inputsToQuery: InputViewModel[], callback: any, callbackContext: any): void;
+    onInputValuesChanged(inputViewModel: InputViewModel): void;
+    protected _beginQueryForValues(inputValues: FormInput_Contracts.InputValues[], inputsViewModel: InputsViewModel): IPromise<FormInput_Contracts.InputValue[]>;
+    protected _showOrHideProgressIndicator(inputId: string, show: boolean): void;
+}
+export class InputsViewModel {
+    private _inputViewModels;
+    private _mapNameToInputViewModel;
+    private _mapNameIsADependent;
+    protected _satisfiedDependentInputs: InputViewModel[];
+    private _valuesChangedCallback;
+    private _formInputViewModel;
+    constructor(formInputViewModel: FormInputViewModel, inputDescriptors: FormInput_Contracts.InputDescriptor[], inputValues: {
+        [key: string]: string;
+    }, inputValidChangedCallback: any, valuesChangedCallback: any);
+    areDirty(): boolean;
+    areValid(): boolean;
+    getInputViewModels(): InputViewModel[];
+    getInputsAsDictionary(): {
+        [key: string]: any;
+    };
+    allDependentsSatisfied(inputViewModel: InputViewModel): boolean;
+    private _invalidateDependencies(changedInputViewModel);
+    private _updateDependencies(changedInputViewModel);
+    protected _querySatisfiedDependentInputValues(): void;
+    private _isADependent(inputViewModel);
+    private _onValueChanged(inputViewModel);
+    private _onBlur(inputViewModel);
+}
+export class InputViewModel {
+    private _inputDescriptor;
+    private _validation;
+    private _value;
+    private _selectedIndex;
+    private _isValid;
+    private _isDirty;
+    private _validationError;
+    private _blurCallback;
+    private _inputValidChangedCallback;
+    private _valueChangedCallback;
+    private _valuesChangedCallback;
+    constructor(inputDescriptor: FormInput_Contracts.InputDescriptor, inputValue: string, inputValidChangedCallback: any, blurCallback: any, valueChangedCallback: any, valuesChangedCallback: any);
+    validate(): void;
+    isDirty(): boolean;
+    isValid(): boolean;
+    isRequired(): boolean;
+    isEmpty(): boolean;
+    isDropList(): boolean;
+    getId(): string;
+    getValue(): any;
+    getValidationMessage(): string;
+    getSelectedIndex(): number;
+    setSelectedIndex(index: number): void;
+    getInputDescriptor(): FormInput_Contracts.InputDescriptor;
+    getPossibleValueAtIndex(index: number): FormInput_Contracts.InputValue;
+    setValue(value: any): void;
+    dependsOn(inputValueId: string): boolean;
+    invalidateValues(): void;
+    updateValues(values: FormInput_Contracts.InputValues): void;
+    onBlur(): void;
+    setStateIcon(): void;
+    private _invalidateValue();
+    private _setValue(value, force);
+    private _computeSelectedIndex();
+    private _setDirty(isDirty);
+    private _setValid(isValid, error?);
+    private _getDefaultIndex();
+    private _getSelectedIndex();
+    private _getDefaultValue();
+    private _validate();
+    private _validateBoolean();
+    private _validateGuid();
+    private _validateNumber();
+    private _validateString();
+    private _validateUri();
 }
 }
 declare module "VSS/Controls/Grids" {
@@ -6452,7 +6784,7 @@ export interface IGridContextMenu {
      * Execute action for the popup menu
      */
     executeAction?: (args: any) => any;
-    contributionPoints?: any;
+    contributionIds?: string[];
 }
 export interface IGridGutterOptions {
     /**
@@ -6619,7 +6951,7 @@ export class GridO<TOptions extends IGridOptions> extends Controls.Control<TOpti
     _gutterWidth: number;
     _contentSize: any;
     _rows: any;
-    _focus: any;
+    _focus: JQuery;
     _scroller: any;
     _canvasDroppable: any;
     _canvas: any;
@@ -7070,7 +7402,7 @@ export class GridO<TOptions extends IGridOptions> extends Controls.Control<TOpti
      */
     beginFormatTable(operationCompleteCallback: IResultCallback, errorCallback?: IErrorCallback, formatterType?: new (grid: GridO<TOptions>, options?: any) => Data.ITableFormatter, options?: any): void;
     _createElement(): void;
-    _addSpacingElements(): void;
+    protected _addSpacingElements(): void;
     _createFocusElement(): JQuery;
     private _buildDom();
     _shouldAttachContextMenuEvents(): boolean;
@@ -7589,7 +7921,7 @@ import Controls = require("VSS/Controls");
 * Info for the hubs and hub groups applicable for a given context
 */
 export interface HubsContext {
-    hubGroupsContributionPointId: string;
+    HubGroupsCollectionContributionId: string;
     selectedHubGroupId: string;
     hubGroups: HubGroup[];
     hubs: Hub[];
@@ -7642,7 +7974,6 @@ export class HubNavigationView extends Controls.BaseControl {
     private _hubsInitialized;
     private _selectedHubGroupSet;
     initialize(): void;
-    private _loadHubsFromDevModeContributions();
     private _setHubGroupUris(hub?);
     private _decorate();
     updateHubGroupLink(groupId: string, newUrl: string, clickHandler?: (eventObject: JQueryEventObject) => any): void;
@@ -7652,11 +7983,7 @@ export class HubNavigationView extends Controls.BaseControl {
     private _doesHubGroupExist(id);
     private _doesHubExist(id);
 }
-/**
-* ExternalHub inherits from ExternalPart to support new XDMChannel
-*/
 export class ExternalHub extends Controls.BaseControl {
-    private _host;
     private createHost(contribution);
     private beginGetHubContentUri(contribution);
     initialize(): void;
@@ -7834,10 +8161,10 @@ export interface MenuContributionProviderOptions {
 }
 export interface MenuOptions extends MenuBaseOptions {
     suppressInitContributions: boolean;
-    contributionPoints: string[];
+    contributionIds: string[];
     items: IMenuItemSpec[];
     executeAction: Function;
-    getContributionContext?: Function;
+    getContributionContext: Function;
 }
 export class Menu<TOptions extends MenuOptions> extends MenuBase<TOptions> {
     static enhancementTypeName: string;
@@ -9183,6 +9510,7 @@ export class BaseValidator<TOptions extends BaseValidatorOptions> extends Contro
     static EVENT_VALIDATE: string;
     static EVENT_VALIDATE_STATUS: string;
     instanceId: any;
+    private _onValidationRequiredDelegate;
     /**
      * @param options
      */
@@ -9192,6 +9520,7 @@ export class BaseValidator<TOptions extends BaseValidatorOptions> extends Contro
      */
     initializeOptions(options?: TOptions): void;
     initialize(): void;
+    dispose(): void;
     getValue(): any;
     /**
      * @return
@@ -9334,6 +9663,7 @@ export class IntegerRangeValidator<TOptions extends IntegerRangeValidatorOptions
      * @return True if valid, false otherwise
      */
     isValid(): boolean;
+    isWithinBounds(value: string, max: number, min: number): boolean;
     /**
      * OVERRIDE: Gets the error message for display purposes
      *
@@ -9449,8 +9779,8 @@ export interface Registration {
     organizationLocation: string;
     organizationName: string;
     /**
-    * Raw cert data string from public key. This will be used for authenticating medium trust clients.
-    */
+     * Raw cert data string from public key. This will be used for authenticating medium trust clients.
+     */
     publicKey: string;
     redirectUris: string[];
     registrationDescription: string;
@@ -9462,7 +9792,7 @@ export interface Registration {
     registrationTermsOfServiceLocation: string;
     responseTypes: string;
     scopes: string;
-    secrect: string;
+    secret: string;
     secretVersionId: string;
 }
 export enum SessionTokenError {
@@ -9989,6 +10319,684 @@ export class Debug {
     static logVerbose(message: string): void;
 }
 }
+declare module "VSS/Error" {
+/**
+ * publish error to telemetry service
+ */
+export function publishErrorToTelemetry(error: TfsError, immediate?: boolean): void;
+}
+declare module "VSS/ExtensionManagement/Contracts" {
+export interface AppDataSetting {
+    key: string;
+    value: string;
+}
+/**
+ * An individual contribution made by an extension
+ */
+export interface Contribution extends ContributionBase {
+    /**
+     * Properties/attributes of this contribution
+     */
+    properties: any;
+    /**
+     * The ids of the contribution(s) that this contribution targets. (parent contributions)
+     */
+    targets: string[];
+    /**
+     * Id of the Contribution Type
+     */
+    type: string;
+}
+/**
+ * Base class shared by contributions and contribution types
+ */
+export interface ContributionBase {
+    /**
+     * Description of the contribution/type
+     */
+    description: string;
+    /**
+     * Extension-relative identifier of the contribution/type
+     */
+    id: string;
+}
+/**
+ * Identifier for contributions and contribution types
+ */
+export interface ContributionIdentifier {
+    /**
+     * The extension id
+     */
+    extensionId: string;
+    /**
+     * The full/unique identifier of the contribution/contributionType
+     */
+    id: string;
+    /**
+     * The publisher id
+     */
+    publisherId: string;
+    /**
+     * The extension-relative contribution id
+     */
+    relativeId: string;
+}
+/**
+ * A point to which extensions can make contributions
+ */
+export interface ContributionPoint extends ContributionIdentifier {
+    /**
+     * Description of this contribution point
+     */
+    description: string;
+    /**
+     * Id of the contribution type of this point
+     */
+    type: string;
+}
+/**
+ * Description about a property of a contribution type
+ */
+export interface ContributionPropertyDescription {
+    /**
+     * Description of the property
+     */
+    description: string;
+    /**
+     * Name of the property
+     */
+    name: string;
+    /**
+     * True if this property is required
+     */
+    required: boolean;
+    /**
+     * The type of value used for this property
+     */
+    type: ContributionPropertyType;
+}
+export enum ContributionPropertyType {
+    /**
+     * Contribution type is unknown (value may be anything)
+     */
+    Unknown = 0,
+    /**
+     * Value is a string
+     */
+    String = 1,
+    /**
+     * Value is a Uri
+     */
+    Uri = 2,
+    /**
+     * Value is a GUID
+     */
+    Guid = 4,
+    /**
+     * Value is True or False
+     */
+    Boolean = 8,
+    /**
+     * Value is an integer
+     */
+    Integer = 16,
+    /**
+     * Value is a double
+     */
+    Double = 32,
+    /**
+     * Value is a DateTime object
+     */
+    DateTime = 64,
+    /**
+     * Value is a generic Dictionary/JObject/property bag
+     */
+    Dictionary = 128,
+    /**
+     * Value is an array
+     */
+    Array = 256,
+    /**
+     * Value is an arbitrary/custom object
+     */
+    Object = 512,
+}
+/**
+ * Information about the provider of an extension
+ */
+export interface ContributionProvider {
+    /**
+     * Name of the extension owner/provider
+     */
+    name: string;
+    /**
+     * Url of the extension owner/provider's website
+     */
+    website: string;
+}
+/**
+ * A contribution type, given by a json schema
+ */
+export interface ContributionType extends ContributionBase {
+    /**
+     * Friendly name of the contribution/type
+     */
+    name: string;
+    /**
+     * Describes the allowed properties for this contribution type
+     */
+    properties: {
+        [key: string]: ContributionPropertyDescription;
+    };
+}
+/**
+ * Represents a VSO "extension" which is a container for contributions and contribution types
+ */
+export interface Extension extends ExtensionManifest {
+    /**
+     * The friendly extension id for this extension - unique for a given publisher.
+     */
+    extensionId: string;
+    /**
+     * Extension flags relevant to contribution consumers
+     */
+    flags: ExtensionFlags;
+    /**
+     * Globally unique id for this extension (the same id is used for all versions of a single extension)
+     */
+    id: string;
+    /**
+     * Unique id of the publisher of this extension
+     */
+    publisherId: string;
+    /**
+     * Unique id for this extension (the same id is used for all versions of a single extension)
+     */
+    registrationId: string;
+    /**
+     * Version of this extension
+     */
+    version: string;
+}
+/**
+ * Base class for an event callback for an extension
+ */
+export interface ExtensionEventCallback {
+    /**
+     * The uri of the endpoint that is hit when an event occurs
+     */
+    uri: string;
+}
+/**
+ * Collection of event callbacks - endpoints called when particular extension events occur.
+ */
+export interface ExtensionEventCallbackCollection {
+    /**
+     * For multi-version extensions, defines an endpoint that gets called via an OPTIONS request to determine the particular version of the extension to be used
+     */
+    versionCheck: ExtensionEventCallback;
+}
+export enum ExtensionFlags {
+    /**
+     * A built-in extension is installed for all VSO accounts by default
+     */
+    BuiltIn = 1,
+    /**
+     * The extension comes from a fully-trusted publisher
+     */
+    Trusted = 2,
+}
+/**
+ * The state of an installed extension
+ */
+export interface ExtensionInstallationState {
+    /**
+     * Whether or not the extension is currently enabled in a particular extension installation
+     */
+    enabled: boolean;
+    /**
+     * The time at which this installation was last updated
+     */
+    lastUpdated: Date;
+    /**
+     * Identifier of the user who last changed the installation state (install, enable, disable, etc.)
+     */
+    lastUpdatedBy: string;
+}
+/**
+ * Base class for extension properties which are shared by the extension manifest and the extension model
+ */
+export interface ExtensionManifest {
+    /**
+     * Uri used as base for other relative uri's defined in extension
+     */
+    baseUri: string;
+    /**
+     * List of contributions made by this extension
+     */
+    contributions: Contribution[];
+    /**
+     * List of contribution types defined by this extension
+     */
+    contributionTypes: ContributionType[];
+    /**
+     * Collection of endpoints that get called when particular extension events occur
+     */
+    eventCallbacks: ExtensionEventCallbackCollection;
+    /**
+     * Version of the extension manifest format/content
+     */
+    manifestVersion: number;
+    /**
+     * List of all oauth scopes required by this extension
+     */
+    scopes: string[];
+}
+/**
+ * Base class for extension properties which are shared by the extension manifest and the extension model
+ */
+export interface ExtensionManifestOld {
+    /**
+     * Uri used as base for other relative uri's defined in extension
+     */
+    baseUri: string;
+    /**
+     * Dictionary of all contribution points keyed by contribution point id
+     */
+    contributionPoints: {
+        [key: string]: ContributionPoint;
+    };
+    /**
+     * Dictionary of all contributions (property bags) keyed by contribution point id
+     */
+    contributions: {
+        [key: string]: any[];
+    };
+    /**
+     * Dictionary of all contribution types keyed by contribution point type id
+     */
+    contributionTypes: {
+        [key: string]: any;
+    };
+    /**
+     * Description of the extension
+     */
+    description: string;
+    /**
+     * Url to the icon to use when displaying this extension
+     */
+    icon: string;
+    /**
+     * Friendly name of the extension
+     */
+    name: string;
+    /**
+     * Namespace identifier for an extension. For example, "vss.web". This serves as a prefix in references to this extension's contributions, contribution types, and contribution points.
+     */
+    namespace: string;
+    /**
+     * Information about the provider/owner of this extension
+     */
+    provider: ContributionProvider;
+    /**
+     * Version of this extension
+     */
+    version: string;
+    /**
+     * Url used to perform version checks for an extension
+     */
+    versionCheckUrl: string;
+}
+/**
+ * Represents a VSO "extension" which is a container for internal and 3rd party contributions and contribution points
+ */
+export interface ExtensionOld extends ExtensionManifestOld {
+    /**
+     * Unique id for this extension (the same id is used for all versions of a single extension)
+     */
+    id: string;
+    /**
+     * Information about which store this extension is published and when/by-whom it was published
+     */
+    publishInfo: ExtensionPublishInfo;
+}
+/**
+ * Publishing information about an extension
+ */
+export interface ExtensionPublishInfo {
+    /**
+     * When the extension was last updated
+     */
+    lastUpdated: Date;
+    /**
+     * Id of the user who published the extension
+     */
+    ownerId: string;
+    /**
+     * Store to which the extension is published
+     */
+    store: ExtensionStore;
+}
+export enum ExtensionStateFlags {
+    /**
+     * No flags set
+     */
+    None = 0,
+    /**
+     * Extension is disabled
+     */
+    Disabled = 1,
+    /**
+     * Extension is a built in
+     */
+    BuiltIn = 2,
+    /**
+     * Extension has multiple versions
+     */
+    MultiVersion = 4,
+    /**
+     * Extension is not installed.  This is for builtin extensions only and can not otherwise be set.
+     */
+    UnInstalled = 8,
+    /**
+     * Error performing version check
+     */
+    VersionCheckError = 16,
+}
+/**
+ * Store into which extensions can be published
+ */
+export interface ExtensionStore {
+    /**
+     * Type of extension store
+     */
+    extensionStoreType: ExtensionStoreType;
+    /**
+     * Unique identifier for this store
+     */
+    id: number;
+    /**
+     * Identifier for the target of the extension store. For a developer store, for example, this is the unique user id of the developer.
+     */
+    target: string;
+}
+export enum ExtensionStoreType {
+    /**
+     * Extension store type is unknown
+     */
+    Unknown = 0,
+    /**
+     * Store for builtin VSO extensions
+     */
+    BuiltIn = 1,
+    /**
+     * Store for an individual extension developer
+     */
+    Developer = 2,
+}
+/**
+ * Represents a VSO extension along with its installation state
+ */
+export interface InstalledExtension extends Extension {
+    /**
+     * Information about this particular installation of the extension
+     */
+    installState: InstalledExtensionState;
+}
+/**
+ * The state of an installed extension
+ */
+export interface InstalledExtensionState {
+    /**
+     * States of an installed extension
+     */
+    flags: ExtensionStateFlags;
+    /**
+     * The time at which this installation was last updated
+     */
+    lastUpdated: Date;
+}
+/**
+ * Information about the extension
+ */
+export interface SupportedExtension {
+    /**
+     * Unique Identifier for this extension
+     */
+    extension: string;
+    /**
+     * Unique Identifier for this publisher
+     */
+    publisher: string;
+    /**
+     * Supported version for this extension
+     */
+    version: string;
+}
+export var TypeInfo: {
+    AppDataSetting: {
+        fields: any;
+    };
+    Contribution: {
+        fields: any;
+    };
+    ContributionBase: {
+        fields: any;
+    };
+    ContributionIdentifier: {
+        fields: any;
+    };
+    ContributionPoint: {
+        fields: any;
+    };
+    ContributionPropertyDescription: {
+        fields: any;
+    };
+    ContributionPropertyType: {
+        enumValues: {
+            "unknown": number;
+            "string": number;
+            "uri": number;
+            "guid": number;
+            "boolean": number;
+            "integer": number;
+            "double": number;
+            "dateTime": number;
+            "dictionary": number;
+            "array": number;
+            "object": number;
+        };
+    };
+    ContributionProvider: {
+        fields: any;
+    };
+    ContributionType: {
+        fields: any;
+    };
+    Extension: {
+        fields: any;
+    };
+    ExtensionEventCallback: {
+        fields: any;
+    };
+    ExtensionEventCallbackCollection: {
+        fields: any;
+    };
+    ExtensionFlags: {
+        enumValues: {
+            "builtIn": number;
+            "trusted": number;
+        };
+    };
+    ExtensionInstallationState: {
+        fields: any;
+    };
+    ExtensionManifest: {
+        fields: any;
+    };
+    ExtensionManifestOld: {
+        fields: any;
+    };
+    ExtensionOld: {
+        fields: any;
+    };
+    ExtensionPublishInfo: {
+        fields: any;
+    };
+    ExtensionStateFlags: {
+        enumValues: {
+            "none": number;
+            "disabled": number;
+            "builtIn": number;
+            "multiVersion": number;
+            "unInstalled": number;
+            "versionCheckError": number;
+        };
+    };
+    ExtensionStore: {
+        fields: any;
+    };
+    ExtensionStoreType: {
+        enumValues: {
+            "unknown": number;
+            "builtIn": number;
+            "developer": number;
+        };
+    };
+    InstalledExtension: {
+        fields: any;
+    };
+    InstalledExtensionState: {
+        fields: any;
+    };
+    SupportedExtension: {
+        fields: any;
+    };
+};
+}
+declare module "VSS/ExtensionManagement/RestClient" {
+import Contracts = require("VSS/ExtensionManagement/Contracts");
+import VSS_WebApi = require("VSS/WebApi/RestClient");
+export class ExtensionManagementHttpClient extends VSS_WebApi.VssHttpClient {
+    static serviceInstanceId: string;
+    constructor(rootRequestPath: string);
+    /**
+     * [Preview API]
+     *
+     * @param {string} contributionId
+     * @return IPromise<Contracts.Contribution[]>
+     */
+    getContributions(contributionId: string): IPromise<Contracts.Contribution[]>;
+    /**
+     * [Preview API]
+     *
+     * @param {any} doc
+     * @param {string} extensionId
+     * @param {string} scopeType
+     * @param {string} scopeValue
+     * @param {string} collectionName
+     * @return IPromise<any>
+     */
+    createDocument(doc: any, extensionId: string, scopeType: string, scopeValue: string, collectionName: string): IPromise<any>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} scopeType
+     * @param {string} scopeValue
+     * @param {string} collectionName
+     * @param {string} documentId
+     * @return IPromise<void>
+     */
+    deleteDocument(extensionId: string, scopeType: string, scopeValue: string, collectionName: string, documentId: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} scopeType
+     * @param {string} scopeValue
+     * @param {string} collectionName
+     * @param {string} documentId
+     * @return IPromise<any>
+     */
+    getDocument(extensionId: string, scopeType: string, scopeValue: string, collectionName: string, documentId: string): IPromise<any>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} scopeType
+     * @param {string} scopeValue
+     * @param {string} collectionName
+     * @return IPromise<any[]>
+     */
+    getDocuments(extensionId: string, scopeType: string, scopeValue: string, collectionName: string): IPromise<any[]>;
+    /**
+     * [Preview API]
+     *
+     * @param {any} doc
+     * @param {string} extensionId
+     * @param {string} scopeType
+     * @param {string} scopeValue
+     * @param {string} collectionName
+     * @return IPromise<any>
+     */
+    setDocument(doc: any, extensionId: string, scopeType: string, scopeValue: string, collectionName: string): IPromise<any>;
+    /**
+     * [Preview API]
+     *
+     * @param {any} doc
+     * @param {string} extensionId
+     * @param {string} scopeType
+     * @param {string} scopeValue
+     * @param {string} collectionName
+     * @return IPromise<any>
+     */
+    updateDocument(doc: any, extensionId: string, scopeType: string, scopeValue: string, collectionName: string): IPromise<any>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @return IPromise<Contracts.InstalledExtension>
+     */
+    getInstalledExtension(extensionId: string): IPromise<Contracts.InstalledExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {string[]} contributionIdFilter
+     * @param {boolean} includeDisabledExtensions
+     * @return IPromise<Contracts.InstalledExtension[]>
+     */
+    getInstalledExtensions(contributionIdFilter?: string[], includeDisabledExtensions?: boolean): IPromise<Contracts.InstalledExtension[]>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.InstalledExtension} extension
+     * @return IPromise<Contracts.InstalledExtension>
+     */
+    installExtension(extension: Contracts.InstalledExtension): IPromise<Contracts.InstalledExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @return IPromise<void>
+     */
+    uninstallExtension(extensionId: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.InstalledExtension} extension
+     * @param {string} extensionId
+     * @return IPromise<Contracts.InstalledExtension>
+     */
+    updateInstalledExtension(extension: Contracts.InstalledExtension, extensionId?: string): IPromise<Contracts.InstalledExtension>;
+    /**
+     * [Preview API]
+     *
+     * @return IPromise<string>
+     */
+    getToken(): IPromise<string>;
+}
+}
 declare module "VSS/FeatureAvailability/Contracts" {
 export interface FeatureFlag {
     description: string;
@@ -9998,8 +11006,8 @@ export interface FeatureFlag {
     uri: string;
 }
 /**
-* This is passed to the FeatureFlagController to edit the status of a feature flag
-*/
+ * This is passed to the FeatureFlagController to edit the status of a feature flag
+ */
 export interface FeatureFlagPatch {
     state: string;
 }
@@ -10018,21 +11026,21 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class FeatureAvailabilityHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
-     * Retrieve a listing of all feature flags and their current states for a user
+     * [Preview API] Retrieve a listing of all feature flags and their current states for a user
      *
      * @param {string} userEmail - The email of the user to check
      * @return IPromise<Contracts.FeatureFlag[]>
      */
     getAllFeatureFlags(userEmail?: string): IPromise<Contracts.FeatureFlag[]>;
     /**
-     * Retrieve information on a single feature flag and its current states
+     * [Preview API] Retrieve information on a single feature flag and its current states
      *
      * @param {string} name - The name of the feature to retrieve
      * @return IPromise<Contracts.FeatureFlag>
      */
     getFeatureFlagByName(name: string): IPromise<Contracts.FeatureFlag>;
     /**
-     * Retrieve information on a single feature flag and its current states for a user
+     * [Preview API] Retrieve information on a single feature flag and its current states for a user
      *
      * @param {string} name - The name of the feature to retrieve
      * @param {string} userEmail - The email of the user to check
@@ -10040,7 +11048,7 @@ export class FeatureAvailabilityHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getFeatureFlagByNameAndUserEmail(name: string, userEmail: string): IPromise<Contracts.FeatureFlag>;
     /**
-     * Retrieve information on a single feature flag and its current states for a user
+     * [Preview API] Retrieve information on a single feature flag and its current states for a user
      *
      * @param {string} name - The name of the feature to retrieve
      * @param {string} userId - The id of the user to check
@@ -10048,7 +11056,7 @@ export class FeatureAvailabilityHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getFeatureFlagByNameAndUserId(name: string, userId: string): IPromise<Contracts.FeatureFlag>;
     /**
-     * Change the state of an individual feature flag for a name
+     * [Preview API] Change the state of an individual feature flag for a name
      *
      * @param {Contracts.FeatureFlagPatch} state - State that should be set
      * @param {string} name - The name of the feature to change
@@ -10106,149 +11114,149 @@ export class FeatureAvailabilityService extends Service.VssService {
 declare module "VSS/FileContainer/Contracts" {
 export enum ContainerItemStatus {
     /**
-    * Item is created.
-    */
+     * Item is created.
+     */
     Created = 1,
     /**
-    * Item is a file pending for upload.
-    */
+     * Item is a file pending for upload.
+     */
     PendingUpload = 2,
 }
 export enum ContainerItemType {
     /**
-    * Any item type.
-    */
+     * Any item type.
+     */
     Any = 0,
     /**
-    * Item is a folder which can have child items.
-    */
+     * Item is a folder which can have child items.
+     */
     Folder = 1,
     /**
-    * Item is a file which is stored in the file service.
-    */
+     * Item is a file which is stored in the file service.
+     */
     File = 2,
 }
 export enum ContainerOptions {
     /**
-    * No option.
-    */
+     * No option.
+     */
     None = 0,
 }
 /**
-* Represents a container that encapsulates a hierarchical file system.
-*/
+ * Represents a container that encapsulates a hierarchical file system.
+ */
 export interface FileContainer {
     /**
-    * Uri of the artifact associated with the container.
-    */
+     * Uri of the artifact associated with the container.
+     */
     artifactUri: string;
     contentLocation: string;
     /**
-    * Owner.
-    */
+     * Owner.
+     */
     createdBy: string;
     /**
-    * Creation date.
-    */
+     * Creation date.
+     */
     dateCreated: Date;
     /**
-    * Description.
-    */
+     * Description.
+     */
     description: string;
     /**
-    * Id.
-    */
+     * Id.
+     */
     id: number;
     /**
-    * Location of the item resource.
-    */
+     * Location of the item resource.
+     */
     itemLocation: string;
     /**
-    * Name.
-    */
+     * Name.
+     */
     name: string;
     /**
-    * Options the container can have.
-    */
+     * Options the container can have.
+     */
     options: ContainerOptions;
     /**
-    * Project Id.
-    */
+     * Project Id.
+     */
     scopeIdentifier: string;
     /**
-    * Security token of the artifact associated with the container.
-    */
+     * Security token of the artifact associated with the container.
+     */
     securityToken: string;
     /**
-    * Identifier of the optional encryption key.
-    */
+     * Identifier of the optional encryption key.
+     */
     signingKeyId: string;
     /**
-    * Total size of the files in bytes.
-    */
+     * Total size of the files in bytes.
+     */
     size: number;
 }
 /**
-* Represents an item in a container.
-*/
+ * Represents an item in a container.
+ */
 export interface FileContainerItem {
     /**
-    * Container Id.
-    */
+     * Container Id.
+     */
     containerId: number;
     contentId: number[];
     contentLocation: string;
     /**
-    * Creator.
-    */
+     * Creator.
+     */
     createdBy: string;
     /**
-    * Creation date.
-    */
+     * Creation date.
+     */
     dateCreated: Date;
     /**
-    * Last modified date.
-    */
+     * Last modified date.
+     */
     dateLastModified: Date;
     /**
-    * Encoding of the file. Zero if not a file.
-    */
+     * Encoding of the file. Zero if not a file.
+     */
     fileEncoding: number;
     /**
-    * Hash value of the file. Null if not a file.
-    */
+     * Hash value of the file. Null if not a file.
+     */
     fileHash: number[];
     /**
-    * Length of the file. Zero if not of a file.
-    */
+     * Length of the file. Zero if not of a file.
+     */
     fileLength: number;
     /**
-    * Type of the file. Zero if not a file.
-    */
+     * Type of the file. Zero if not a file.
+     */
     fileType: number;
     /**
-    * Location of the item resource.
-    */
+     * Location of the item resource.
+     */
     itemLocation: string;
     /**
-    * Type of the item: Folder, File or String.
-    */
+     * Type of the item: Folder, File or String.
+     */
     itemType: ContainerItemType;
     /**
-    * Modifier.
-    */
+     * Modifier.
+     */
     lastModifiedBy: string;
     /**
-    * Unique path that identifies the item.
-    */
+     * Unique path that identifies the item.
+     */
     path: string;
     /**
-    * Project Id.
-    */
+     * Project Id.
+     */
     scopeIdentifier: string;
     /**
-    * Status of the item: Created or Pending Upload.
-    */
+     * Status of the item: Created or Pending Upload.
+     */
     status: ContainerItemStatus;
     ticket: string;
 }
@@ -10286,7 +11294,7 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class FileContainerHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
-     * Creates the specified item in the container referenced container.
+     * [Preview API] Creates the specified item in the container referenced container.
      *
      * @param {number} containerId
      * @param {string} itemPath
@@ -10295,7 +11303,7 @@ export class FileContainerHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createItem(containerId: number, itemPath: string, scope?: string): IPromise<Contracts.FileContainerItem>;
     /**
-     * Creates the specified items in in the referenced container.
+     * [Preview API] Creates the specified items in in the referenced container.
      *
      * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.FileContainerItem[]>} items
      * @param {number} containerId
@@ -10304,7 +11312,7 @@ export class FileContainerHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createItems(items: VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.FileContainerItem[]>, containerId: number, scope?: string): IPromise<Contracts.FileContainerItem[]>;
     /**
-     * Deletes the specified items in a container.
+     * [Preview API] Deletes the specified items in a container.
      *
      * @param {number} containerId - Container Id.
      * @param {string} itemPath - Path to delete.
@@ -10313,7 +11321,7 @@ export class FileContainerHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteItem(containerId: number, itemPath: string, scope?: string): IPromise<void>;
     /**
-     * Gets containers filtered by a comma separated list of artifact uris within the same scope, if not specified returns all containers
+     * [Preview API] Gets containers filtered by a comma separated list of artifact uris within the same scope, if not specified returns all containers
      *
      * @param {string} scope - A guid representing the scope of the container. This is often the project id.
      * @param {string} artifactUris
@@ -10321,7 +11329,7 @@ export class FileContainerHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getContainers(scope?: string, artifactUris?: string): IPromise<Contracts.FileContainer[]>;
     /**
-     * Gets the specified file container object in a format dependent upon the given parameters or HTTP Accept request header
+     * [Preview API] Gets the specified file container object in a format dependent upon the given parameters or HTTP Accept request header
      *
      * @param {number} containerId - The requested container Id
      * @param {string} scope - A guid representing the scope of the container. This is often the project id.
@@ -10361,6 +11369,677 @@ export class FileContainerService extends Service.VssService {
      * @param fileContainerPath The path of the container. For example, "#/12/drop".
      */
     parseContainerPath(fileContainerPath: string): FileContainerPathInfo;
+}
+}
+declare module "VSS/Gallery/Contracts" {
+export interface ExtensionAccount {
+    accountId: string;
+    accountName: string;
+}
+export interface ExtensionFile {
+    assetType: string;
+    contentType: string;
+    fileId: number;
+    shortDescription: string;
+    version: string;
+}
+/**
+ * The FilterResult is the set of extensions that matched a particular query filter.
+ */
+export interface ExtensionFilterResult {
+    /**
+     * This is the set of appplications that matched the query filter supplied.
+     */
+    extensions: PublishedExtension[];
+    /**
+     * The PagingToken is returned from a request when more records exist that match the result than were requested or could be returned. A follow-up query with this paging token can be used to retrieve more results.
+     */
+    pagingToken: string;
+}
+/**
+ * Package that will be used to create or update a published extension
+ */
+export interface ExtensionPackage {
+    /**
+     * Base 64 encoded extension package
+     */
+    extensionManifest: string;
+}
+/**
+ * An ExtensionQuery is used to search the gallery for a set of extensions that match one of many filter values.
+ */
+export interface ExtensionQuery {
+    /**
+     * Each filter is a unique query and will have matching set of extensions returned from the request. Each result will have the same index in the resulting array that the filter had in the incoming query.
+     */
+    filters: QueryFilter[];
+    /**
+     * The Flags are used to deterine which set of information the caller would like returned for the matched extensions.
+     */
+    flags: ExtensionQueryFlags;
+}
+export enum ExtensionQueryFilterType {
+    /**
+     * The values are used as tags. All tags are treated as "OR" conditions with each other. There may be some value put on the number of matched tags from the query.
+     */
+    Tag = 1,
+    /**
+     * The Values are an ExtensionName or fragment that is used to match other extension names.
+     */
+    DisplayName = 2,
+    /**
+     * The Filter is one or more tokens that define what scope to return private extensions for.
+     */
+    Private = 3,
+    /**
+     * Retrieve a set of extensions based on their id's. The values should be the extension id's encoded as strings.
+     */
+    Id = 4,
+    /**
+     * The catgeory is unlike other filters. It is AND'd with the other filters instead of being a seperate query.
+     */
+    Category = 5,
+}
+export enum ExtensionQueryFlags {
+    /**
+     * None is used to retrieve only the basic extension details.
+     */
+    None = 0,
+    /**
+     * IncludeVersions will return version information for extensions returned
+     */
+    IncludeVersions = 1,
+    /**
+     * IncludeFiles will return information about which files were found within the extension that were stored independant of the manifest. When asking for files, versions will be included as well since files are returned as a property of the versions.  These files can be retrieved using the path to the file without requiring the entire manifest be downloaded.
+     */
+    IncludeFiles = 2,
+    /**
+     * Include the Categories and Tags that were added to the extension definition.
+     */
+    IncludeCategoryAndTags = 4,
+    /**
+     * Include the details about which accounts the extension has been shared with if the extesion is a private extension.
+     */
+    IncludeSharedAccounts = 8,
+    /**
+     * Include properties associated with versions of the extension
+     */
+    IncludeVersionProperties = 16,
+}
+/**
+ * This is the set of extensions that matched a supplied query through the filters given.
+ */
+export interface ExtensionQueryResult {
+    /**
+     * For each filter supplied in the query, a filter result will be returned in the query result.
+     */
+    results: ExtensionFilterResult[];
+}
+export interface ExtensionVersion {
+    files: ExtensionFile[];
+    flags: ExtensionVersionFlags;
+    lastUpdated: Date;
+    properties: {
+        key: string;
+        value: string;
+    }[];
+    validationResultMessage: string;
+    version: string;
+    versionDescription: string;
+}
+export enum ExtensionVersionFlags {
+    /**
+     * No flags exist for this version.
+     */
+    None = 0,
+    /**
+     * The Validated flag for a version means the extension version has passed validation and can be used..
+     */
+    Validated = 1,
+}
+/**
+ * One condition in a QueryFilter.
+ */
+export interface FilterCriteria {
+    filterType: number;
+    /**
+     * The value used in the match based on the filter type.
+     */
+    value: string;
+}
+export enum PagingDirection {
+    /**
+     * Backward will return results from earlier in the resultset.
+     */
+    Backward = 1,
+    /**
+     * Forward will return results from later in the resultset.
+     */
+    Forward = 2,
+}
+export interface PublishedExtension {
+    allowedAccounts: ExtensionAccount[];
+    categories: string[];
+    displayName: string;
+    extensionId: string;
+    extensionName: string;
+    flags: PublishedExtensionFlags;
+    lastUpdated: Date;
+    longDescription: string;
+    publisher: PublisherFacts;
+    shortDescription: string;
+    tags: string[];
+    versions: ExtensionVersion[];
+}
+export enum PublishedExtensionFlags {
+    /**
+     * This should never be returned, it is used to represent a extension who's flags havent changed during update calls.
+     */
+    UnChanged = 1073741824,
+    /**
+     * No flags exist for this extension.
+     */
+    None = 0,
+    /**
+     * The Disabled flag for an extension means the extension can't be changed and won't be used by consumers. The disabled flag is managed by the service and can't be supplied by the Extension Developers.
+     */
+    Disabled = 1,
+    /**
+     * BuiltIn Extension are available to all Tenants. An explicit registration is not required. This attribute is reserved and can't be supplied by Extension Developers.  BuiltIn extensions are by definition Public. There is no need to set the public flag for extensions marked BuiltIn.
+     */
+    BuiltIn = 2,
+    /**
+     * This extension has been validated by the service. The extension meets the requirements specified. This attribute is reserved and can't be supplied by the Extension Developers. Validation is a process that ensures that all contributions are well formed. They meet the requirements defined by the contribution type they are extending. Note this attribute will be updated asynchronously as the extension is validated by the developer of the contribution type. There will be restricted access to the extension while this process is performed.  @TODO: Link to extension verification requirements.
+     */
+    Validated = 4,
+    /**
+     * This extension registration is public, making its visibilty open to the public. This means all tenants have the ability to install this extension. Without this flag the extension will be private and will need to be shared with the tenants that can install it.
+     */
+    Public = 256,
+    /**
+     * This extension has multiple versions active at one time and version discovery should be done usig the defined "Version Discovery" protocol to determine the version available to a specific user or tenant.  @TODO: Link to Version Discovery Protocol.
+     */
+    MultiVersion = 512,
+    /**
+     * The system flag is reserved, and cant be used by publishers.
+     */
+    System = 1024,
+    /**
+     * This is the set of flags that can't be supplied by the developer and is managed by the service itself.
+     */
+    ServiceFlags = 1029,
+}
+export interface Publisher {
+    displayName: string;
+    extensions: PublishedExtension[];
+    flags: PublisherFlags;
+    lastUpdated: Date;
+    longDescription: string;
+    publisherId: string;
+    publisherName: string;
+    shortDescription: string;
+}
+/**
+ * High-level information about the publisher, like id's and names
+ */
+export interface PublisherFacts {
+    displayName: string;
+    publisherId: string;
+    publisherName: string;
+}
+/**
+ * The FilterResult is the set of publishers that matched a particular query filter.
+ */
+export interface PublisherFilterResult {
+    /**
+     * This is the set of appplications that matched the query filter supplied.
+     */
+    publishers: Publisher[];
+}
+export enum PublisherFlags {
+    /**
+     * This should never be returned, it is used to represent a publisher who's flags havent changed during update calls.
+     */
+    UnChanged = 1073741824,
+    /**
+     * No flags exist for this publisher.
+     */
+    None = 0,
+    /**
+     * The Disabled flag for a publisher means the publisher can't be changed and won't be used by consumers, this extends to extensions owned by the publisher as well. The disabled flag is managed by the service and can't be supplied by the Extension Developers.
+     */
+    Disabled = 1,
+    /**
+     * This is the set of flags that can't be supplied by the developer and is managed by the service itself.
+     */
+    ServiceFlags = 1,
+}
+export enum PublisherPermissions {
+    /**
+     * This gives the bearer the rights to read Publishers and Extensions.
+     */
+    Read = 1,
+    /**
+     * This gives the bearer the rights to update Publishers and Extensions (but not the ability to Create them).
+     */
+    Write = 2,
+    /**
+     * This gives the bearer the rights to create new Publishers at the root of the namespace.
+     */
+    Create = 4,
+    /**
+     * This gives the bearer the rights to create new Extensions within a publisher.
+     */
+    Publish = 8,
+    /**
+     * Admin gives the bearer the rights to manage restricted attributes of Publishers and Extensions.
+     */
+    Admin = 16,
+    /**
+     * TrustedPartner gives the bearer the rights to publish a extensions with restricted capabilities.
+     */
+    TrustedPartner = 32,
+    /**
+     * PrivateRead is another form of read designed to allow higher privilege accessors the ability to read private extensions.
+     */
+    PrivateRead = 64,
+}
+/**
+ * An PublisherQuery is used to search the gallery for a set of publishers that match one of many filter values.
+ */
+export interface PublisherQuery {
+    /**
+     * Each filter is a unique query and will have matching set of publishers returned from the request. Each result will have the same index in the resulting array that the filter had in the incoming query.
+     */
+    filters: QueryFilter[];
+    /**
+     * The Flags are used to deterine which set of information the caller would like returned for the matched publishers.
+     */
+    flags: PublisherQueryFlags;
+}
+export enum PublisherQueryFilterType {
+    /**
+     * The values are used as tags. All tags are treated as "OR" conditions with each other. There may be some value put on the number of matched tags from the query.
+     */
+    Tag = 1,
+    /**
+     * The Values are an PublisherName or fragment that is used to match other extension names.
+     */
+    DisplayName = 2,
+    /**
+     * The My Query filter is used to retrieve the set of publishers that I have access to publish extesions into. All Values are ignored and the calling user is used as the filter in this case.
+     */
+    My = 3,
+}
+export enum PublisherQueryFlags {
+    /**
+     * None is used to retrieve only the basic publisher details.
+     */
+    None = 0,
+    /**
+     * Is used to include a list of basic extension details for all extensions published by the requested publisher.
+     */
+    IncludeExtensions = 1,
+}
+/**
+ * This is the set of publishers that matched a supplied query through the filters given.
+ */
+export interface PublisherQueryResult {
+    /**
+     * For each filter supplied in the query, a filter result will be returned in the query result.
+     */
+    results: PublisherFilterResult[];
+}
+/**
+ * A filter used to define a set of extensions to return during a query.
+ */
+export interface QueryFilter {
+    /**
+     * The filter values define the set of values in this query. They are applied based on the QueryFilterType.
+     */
+    criteria: FilterCriteria[];
+    /**
+     * The PagingDirection is applied to a paging token if one exists. If not the direction is ignored, and Forward from the start of the resultset is used. Direction should be left out of the request unless a paging token is used to help prevent future issues.
+     */
+    direction: PagingDirection;
+    /**
+     * The page size defines the number of results the caller wants for this filter. The count can't exceed the overall query size limits.
+     */
+    pageSize: number;
+    /**
+     * The paging token is a distinct type of filter and the other filter fields are ignored. The paging token represents the continuation of a previously executed query. The information about where in the result and what fields are being filtered are embeded in the token.
+     */
+    pagingToken: string;
+}
+export enum SigningKeyPermissions {
+    Read = 1,
+    Write = 2,
+}
+export var TypeInfo: {
+    ExtensionAccount: {
+        fields: any;
+    };
+    ExtensionFile: {
+        fields: any;
+    };
+    ExtensionFilterResult: {
+        fields: any;
+    };
+    ExtensionPackage: {
+        fields: any;
+    };
+    ExtensionQuery: {
+        fields: any;
+    };
+    ExtensionQueryFilterType: {
+        enumValues: {
+            "tag": number;
+            "displayName": number;
+            "private": number;
+            "id": number;
+            "category": number;
+        };
+    };
+    ExtensionQueryFlags: {
+        enumValues: {
+            "none": number;
+            "includeVersions": number;
+            "includeFiles": number;
+            "includeCategoryAndTags": number;
+            "includeSharedAccounts": number;
+            "includeVersionProperties": number;
+        };
+    };
+    ExtensionQueryResult: {
+        fields: any;
+    };
+    ExtensionVersion: {
+        fields: any;
+    };
+    ExtensionVersionFlags: {
+        enumValues: {
+            "none": number;
+            "validated": number;
+        };
+    };
+    FilterCriteria: {
+        fields: any;
+    };
+    PagingDirection: {
+        enumValues: {
+            "backward": number;
+            "forward": number;
+        };
+    };
+    PublishedExtension: {
+        fields: any;
+    };
+    PublishedExtensionFlags: {
+        enumValues: {
+            "unChanged": number;
+            "none": number;
+            "disabled": number;
+            "builtIn": number;
+            "validated": number;
+            "public": number;
+            "multiVersion": number;
+            "system": number;
+            "serviceFlags": number;
+        };
+    };
+    Publisher: {
+        fields: any;
+    };
+    PublisherFacts: {
+        fields: any;
+    };
+    PublisherFilterResult: {
+        fields: any;
+    };
+    PublisherFlags: {
+        enumValues: {
+            "unChanged": number;
+            "none": number;
+            "disabled": number;
+            "serviceFlags": number;
+        };
+    };
+    PublisherPermissions: {
+        enumValues: {
+            "read": number;
+            "write": number;
+            "create": number;
+            "publish": number;
+            "admin": number;
+            "trustedPartner": number;
+            "privateRead": number;
+        };
+    };
+    PublisherQuery: {
+        fields: any;
+    };
+    PublisherQueryFilterType: {
+        enumValues: {
+            "tag": number;
+            "displayName": number;
+            "my": number;
+        };
+    };
+    PublisherQueryFlags: {
+        enumValues: {
+            "none": number;
+            "includeExtensions": number;
+        };
+    };
+    PublisherQueryResult: {
+        fields: any;
+    };
+    QueryFilter: {
+        fields: any;
+    };
+    SigningKeyPermissions: {
+        enumValues: {
+            "read": number;
+            "write": number;
+        };
+    };
+};
+}
+declare module "VSS/Gallery/RestClient" {
+import Contracts = require("VSS/Gallery/Contracts");
+import VSS_WebApi = require("VSS/WebApi/RestClient");
+export class GalleryHttpClient extends VSS_WebApi.VssHttpClient {
+    static serviceInstanceId: string;
+    constructor(rootRequestPath: string);
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} accountName
+     * @return IPromise<void>
+     */
+    shareExtensionById(extensionId: string, accountName: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} accountName
+     * @return IPromise<void>
+     */
+    unshareExtensionById(extensionId: string, accountName: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} publisherName
+     * @param {string} extensionName
+     * @param {string} accountName
+     * @return IPromise<void>
+     */
+    shareExtension(publisherName: string, extensionName: string, accountName: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} publisherName
+     * @param {string} extensionName
+     * @param {string} accountName
+     * @return IPromise<void>
+     */
+    unshareExtension(publisherName: string, extensionName: string, accountName: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} version
+     * @param {string} assetType
+     * @param {string} accountToken
+     * @param {boolean} acceptDefault
+     * @return IPromise<ArrayBuffer>
+     */
+    getAsset(extensionId: string, version: string, assetType: string, accountToken?: string, acceptDefault?: boolean): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} languages
+     * @return IPromise<string[]>
+     */
+    getCategories(languages?: string): IPromise<string[]>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} publisherName
+     * @param {string} extensionName
+     * @param {string} version
+     * @return IPromise<ArrayBuffer>
+     */
+    getCertificate(publisherName: string, extensionName: string, version?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.ExtensionQuery} extensionQuery
+     * @param {string} accountToken
+     * @return IPromise<Contracts.ExtensionQueryResult>
+     */
+    queryExtensions(extensionQuery: Contracts.ExtensionQuery, accountToken?: string): IPromise<Contracts.ExtensionQueryResult>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.ExtensionPackage} extensionPackage
+     * @return IPromise<Contracts.PublishedExtension>
+     */
+    createExtension(extensionPackage: Contracts.ExtensionPackage): IPromise<Contracts.PublishedExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} version
+     * @return IPromise<void>
+     */
+    deleteExtensionById(extensionId: string, version?: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} extensionId
+     * @param {string} version
+     * @param {Contracts.ExtensionQueryFlags} flags
+     * @return IPromise<Contracts.PublishedExtension>
+     */
+    getExtensionById(extensionId: string, version?: string, flags?: Contracts.ExtensionQueryFlags): IPromise<Contracts.PublishedExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.ExtensionPackage} extensionPackage
+     * @param {string} extensionId
+     * @return IPromise<Contracts.PublishedExtension>
+     */
+    updateExtensionById(extensionPackage: Contracts.ExtensionPackage, extensionId: string): IPromise<Contracts.PublishedExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.ExtensionPackage} extensionPackage
+     * @param {string} publisherName
+     * @return IPromise<Contracts.PublishedExtension>
+     */
+    createExtensionWithPublisher(extensionPackage: Contracts.ExtensionPackage, publisherName: string): IPromise<Contracts.PublishedExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} publisherName
+     * @param {string} extensionName
+     * @param {string} version
+     * @return IPromise<void>
+     */
+    deleteExtension(publisherName: string, extensionName: string, version?: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} publisherName
+     * @param {string} extensionName
+     * @param {string} version
+     * @param {Contracts.ExtensionQueryFlags} flags
+     * @return IPromise<Contracts.PublishedExtension>
+     */
+    getExtension(publisherName: string, extensionName: string, version?: string, flags?: Contracts.ExtensionQueryFlags): IPromise<Contracts.PublishedExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.ExtensionPackage} extensionPackage
+     * @param {string} publisherName
+     * @param {string} extensionName
+     * @return IPromise<Contracts.PublishedExtension>
+     */
+    updateExtension(extensionPackage: Contracts.ExtensionPackage, publisherName: string, extensionName: string): IPromise<Contracts.PublishedExtension>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.PublisherQuery} publisherQuery
+     * @return IPromise<Contracts.PublisherQueryResult>
+     */
+    queryPublishers(publisherQuery: Contracts.PublisherQuery): IPromise<Contracts.PublisherQueryResult>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.Publisher} publisher
+     * @return IPromise<Contracts.Publisher>
+     */
+    createPublisher(publisher: Contracts.Publisher): IPromise<Contracts.Publisher>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} publisherName
+     * @return IPromise<void>
+     */
+    deletePublisher(publisherName: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} publisherName
+     * @param {number} flags
+     * @return IPromise<Contracts.Publisher>
+     */
+    getPublisher(publisherName: string, flags?: number): IPromise<Contracts.Publisher>;
+    /**
+     * [Preview API]
+     *
+     * @param {Contracts.Publisher} publisher
+     * @param {string} publisherName
+     * @return IPromise<Contracts.Publisher>
+     */
+    updatePublisher(publisher: Contracts.Publisher, publisherName: string): IPromise<Contracts.Publisher>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} keyType
+     * @param {number} expireCurrentSeconds
+     * @return IPromise<void>
+     */
+    generateKey(keyType: string, expireCurrentSeconds?: number): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} keyType
+     * @return IPromise<string>
+     */
+    getSigningKey(keyType: string): IPromise<string>;
 }
 }
 declare module "VSS/Host" {
@@ -10607,6 +12286,13 @@ export class ActionManager {
      */
     static registerActionWorker(action: string, actionWorker: IActionWorker, order?: number): void;
     /**
+     * Un-Register a handler for an action.
+     *
+     * @param action The action to un-register
+     * @param actionWorker Function(actionArgs, next), The IActionWorker that was registered.
+     */
+    static unregisterActionWorker(action: string, actionWorker: IActionWorker): void;
+    /**
      * Invoke the registered action workers for the an action
      *
      * @param action The action identifier
@@ -10669,29 +12355,29 @@ export class RunningDocumentsTable {
 }
 declare module "VSS/Identities/Contracts" {
 /**
-* Container class for changed identities
-*/
+ * Container class for changed identities
+ */
 export interface ChangedIdentities {
     /**
-    * Changed Identities
-    */
+     * Changed Identities
+     */
     identities: Identity[];
     /**
-    * Last Identity SequenceId
-    */
+     * Last Identity SequenceId
+     */
     sequenceContext: ChangedIdentitiesContext;
 }
 /**
-* Context class for changed identities
-*/
+ * Context class for changed identities
+ */
 export interface ChangedIdentitiesContext {
     /**
-    * Last Group SequenceId
-    */
+     * Last Group SequenceId
+     */
     groupSequenceId: number;
     /**
-    * Last Identity SequenceId
-    */
+     * Last Identity SequenceId
+     */
     identitySequenceId: number;
 }
 export interface CreateGroupsInfo {
@@ -10730,8 +12416,8 @@ export enum GroupScopeType {
 }
 export interface Identity {
     /**
-    * The custom display name for the identity (if any). Setting this property to an empty string will clear the existing custom display name. Setting this property to null will not affect the existing persisted value (since null values do not get sent over the wire or to the database)
-    */
+     * The custom display name for the identity (if any). Setting this property to an empty string will clear the existing custom display name. Setting this property to null will not affect the existing persisted value (since null values do not get sent over the wire or to the database)
+     */
     customDisplayName: string;
     descriptor: IdentityDescriptor;
     id: string;
@@ -10744,8 +12430,8 @@ export interface Identity {
     metaTypeId: number;
     properties: any;
     /**
-    * The display name for the identity as specified by the source identity provider.
-    */
+     * The display name for the identity as specified by the source identity provider.
+     */
     providerDisplayName: string;
     resourceVersion: number;
     uniqueUserId: number;
@@ -10758,21 +12444,22 @@ export interface IdentityBatchInfo {
     queryMembership: QueryMembership;
 }
 /**
-* An Identity descriptor is a wrapper for the identity type (Windows SID, Passport) along with a unique identifier such as the SID or PUID.
-*/
+ * An Identity descriptor is a wrapper for the identity type (Windows SID, Passport) along with a unique identifier such as the SID or PUID.
+ */
 export interface IdentityDescriptor {
     /**
-    * The unique identifier for this identity, not exceeding 256 chars, which will be persisted.
-    */
+     * The unique identifier for this identity, not exceeding 256 chars, which will be persisted.
+     */
     identifier: string;
     /**
-    * Type of descriptor (for example, Windows, Passport, etc.).
-    */
+     * Type of descriptor (for example, Windows, Passport, etc.).
+     */
     identityType: string;
 }
 export enum IdentityMetaType {
     Member = 0,
     Guest = 1,
+    Unknown = 255,
 }
 export interface IdentityScope {
     administrators: IdentityDescriptor;
@@ -10787,36 +12474,36 @@ export interface IdentityScope {
 }
 export enum IdentitySearchFilter {
     /**
-    * NT account name (domain\alias)
-    */
+     * NT account name (domain\alias)
+     */
     AccountName = 0,
     /**
-    * Display name
-    */
+     * Display name
+     */
     DisplayName = 1,
     /**
-    * Find project admin group
-    */
+     * Find project admin group
+     */
     AdministratorsGroup = 2,
     /**
-    * Find the identity using the identifier
-    */
+     * Find the identity using the identifier
+     */
     Identifier = 3,
     /**
-    * Email address
-    */
+     * Email address
+     */
     MailAddress = 4,
     /**
-    * A general search for an identity.
-    */
+     * A general search for an identity.
+     */
     General = 5,
     /**
-    * Alternate login username
-    */
+     * Alternate login username
+     */
     Alias = 6,
     /**
-    * Find identity using Domain/TenantId
-    */
+     * Find identity using Domain/TenantId
+     */
     Domain = 7,
 }
 export interface IdentitySelf {
@@ -10850,24 +12537,24 @@ export interface MruIdentitiesUpdateData extends JsonPatchOperationData<string[]
 }
 export enum QueryMembership {
     /**
-    * Query will not return any membership data
-    */
+     * Query will not return any membership data
+     */
     None = 0,
     /**
-    * Query will return only direct membership data
-    */
+     * Query will return only direct membership data
+     */
     Direct = 1,
     /**
-    * Query will return expanded membership data
-    */
+     * Query will return expanded membership data
+     */
     Expanded = 2,
     /**
-    * Query will return expanded up membership data (parents only)
-    */
+     * Query will return expanded up membership data (parents only)
+     */
     ExpandedUp = 3,
     /**
-    * Query will return expanded down membership data (children only)
-    */
+     * Query will return expanded down membership data (children only)
+     */
     ExpandedDown = 4,
 }
 export enum ReadIdentitiesOptions {
@@ -10937,6 +12624,7 @@ export var TypeInfo: {
         enumValues: {
             "member": number;
             "guest": number;
+            "unknown": number;
         };
     };
     IdentityScope: {
@@ -11017,15 +12705,11 @@ export interface IIdentityPickerDropdownOptions extends Identities_Picker_Servic
     /**
     *   type of identities - one or more of User or Group
     **/
-    identityType?: Identities_Picker_Services.IIdentityType;
+    identityType?: Identities_Picker_Services.IEntityType;
     /**
-    *   scope - one or more of AAD, Local
+    *   scope - one or more of AAD, IMS, Source
     **/
     operationScope?: Identities_Picker_Services.IOperationScope;
-    /**
-    *   default identities to initialize the dropdown with
-    **/
-    items?: Identities_Picker_RestClient.IIdentity[];
     /**
     *   restrict displayed identities in dropdown
     **/
@@ -11033,13 +12717,25 @@ export interface IIdentityPickerDropdownOptions extends Identities_Picker_Servic
     /**
     *   what action (usually in parent) should execute when an item in this dropdown is selected
     **/
-    onItemSelect?: (identity: Identities_Picker_RestClient.IIdentity) => any;
+    onItemSelect?: (identity: Identities_Picker_RestClient.IEntity) => any;
+    /**
+    *   a pre-render hook that takes in the list of identities that would otherwise have been displayed and rearranges or adds to them prior to returning the new list
+    **/
+    preDropdownRender?: (entityList: Identities_Picker_RestClient.IEntity[]) => Identities_Picker_RestClient.IEntity[];
+    /**
+    *   the minimum length of the prefix to start searching the directories - in the absence of an MRU - default 3
+    **/
+    minimumPrefixSize?: number;
     /**
     *   whether to display the contact card icon for each identity in the dropdown. Default false.
     **/
     showContactCard?: boolean;
     /**
-    *   the width of the dropdown control. Default is max(positioningElement width, 400px)
+    *   whether to display the MRU with the search button or just search directories directly. Default false.
+    **/
+    showMru?: boolean;
+    /**
+    *   the width of the dropdown control. Default is max(positioningElement width, 300px)
     **/
     width?: number;
     /**
@@ -11050,7 +12746,6 @@ export interface IIdentityPickerDropdownOptions extends Identities_Picker_Servic
     *   the vertex of the base element used as a reference for positioning (horizontal-vertical). See UI.Positioning for details. Default is "left-bottom"
     **/
     baseAlign?: string;
-    tfsContext?: any;
     coreCssClass?: string;
     /**
     *   an element, or a function which returns an element, to be used for determining the alignment and width of the dropdown control.
@@ -11059,36 +12754,45 @@ export interface IIdentityPickerDropdownOptions extends Identities_Picker_Servic
     positioningElement?: JQuery | (() => JQuery);
 }
 export class IdentityPickerDropdownControl extends Controls.Control<IIdentityPickerDropdownOptions> {
-    private static MIN_WIDTH;
     static UPDATE_THUMBNAILS_EVENT: string;
+    private static MIN_RESULTS;
+    private static MAX_RESULTS;
+    private static MIN_WIDTH;
     private _identities;
+    private _mruIdentities;
+    private _searchActive;
+    private _searchDirectories;
+    private _showOnlyMruIdentities;
     private _$itemsContainer;
+    private _$searchStatus;
     private _selectedIndex;
     private _numItemsDisplayed;
     private _scrollTimeout;
-    private _$searchStatus;
+    private _minimumPrefixSize;
     private _indexToItemMap;
-    private _searchActive;
     private _prefix;
     private _isVisible;
     private _identityType;
     private _operationScope;
+    private _preDropdownRender;
+    private _mruIdentityLoader;
+    private _mruIdentitiesLoaded;
     constructor(options?: IIdentityPickerDropdownOptions);
     initializeOptions(options?: IIdentityPickerDropdownOptions): void;
     initialize(): void;
     /**
-    * Set the prefix but do not expect an update to the list
+    * Adds the identity to the querying identity's MRU
     **/
-    updatePrefix(prefix: string): void;
+    addIdentitiesToMru(objectIds: string[]): void;
     /**
     * Returns true if the dropdown is currently being shown
     **/
     isVisible(): boolean;
+    showAllMruIdentities(): IPromise<Identities_Picker_RestClient.IEntity[]>;
     /**
     * Get Identities
     */
-    getIdentities(prefix: string, successCallback?: (data?: Identities_Picker_RestClient.QueryTokenResultModel) => any, errorCallback?: (errorData?: any) => any): void;
-    updateIdentities(items: Identities_Picker_RestClient.IIdentity[], keepIndex?: boolean): void;
+    getIdentities(prefix: string): IPromise<Identities_Picker_RestClient.IEntity[]>;
     /**
     * Show the dropdown
     **/
@@ -11097,32 +12801,49 @@ export class IdentityPickerDropdownControl extends Controls.Control<IIdentityPic
     * Hide the dropdown
     **/
     hide(): void;
-    private updateDropdown(options);
+    getSelectedIndex(): number;
+    getSelectedItem(): Identities_Picker_RestClient.IEntity;
+    handleKeyEvent(e: JQueryEventObject): boolean;
+    private _updateIdentities(items, keepIndex?, render?);
+    /**
+    * Set the prefix but do not expect an update to the list: unused
+    **/
+    private _updatePrefix(prefix);
+    /**
+    *   Return only the MRU users or groups that have the prefix
+    **/
+    private _filterMruIdentities(mruIdentities, prefix);
+    /**
+    * Removes the identity to the querying identity's MRU
+    **/
+    private _removeIdentityFromMru(objectId);
+    /**
+    * Get the querying identity's MRU
+    **/
+    private _getMruIdentities();
+    private _updateDropdown(options);
     /**
     * Scroll to selected item
     **/
-    private setSelectedIndex(selectedIndex, scrollIntoView, position?);
+    private _setSelectedIndex(selectedIndex, scrollIntoView, position?);
     private _scrollItemIntoView(index, position);
     /**
     * Set the position of this control with respect to its parent
     **/
-    private setPosition();
-    private getPositioningElement();
+    private _setPosition();
+    private _getPositioningElement();
     /**
     * Show the status indicator till all users are loaded
     **/
-    private showLoading();
+    private _showLoading();
     /**
     * Show error message in case of non-2xx response
     **/
     private _showError();
-    handleKeyEvent(e: JQueryEventObject): boolean;
     private _nextPage();
     private _prevPage();
     private _nextItem();
     private _prevItem();
-    getSelectedIndex(): number;
-    getSelectedItem(): Identities_Picker_RestClient.IIdentity;
     private _highlightPrefix(textValue);
     /**
     * Create the li that shall represent an user item
@@ -11131,14 +12852,52 @@ export class IdentityPickerDropdownControl extends Controls.Control<IIdentityPic
     private _render();
     private _loadNextPage(force?);
 }
+export interface IIdentityPickerIdCardDialogOptions extends Identities_Picker_Services.IIdentityServiceOptions {
+    /**
+    *   type of identities - one or more of User or Group
+    **/
+    identityType?: Identities_Picker_Services.IEntityType;
+    /**
+    *   scope - one or more of AAD, IMS, Source
+    **/
+    operationScope?: Identities_Picker_Services.IOperationScope;
+    /**
+    *   A list of CSS classes, without the "." identifier, used to close descendant IdCardDialogs
+    **/
+    parentClasses?: string[];
+    /**
+    *   an identity to initialize with (and to avoid a call to the identity picker service API)
+    **/
+    identity?: Identities_Picker_RestClient.IEntity;
+    /**
+    *   the signInAddress of the identity which shall be displayed in the IdCardDialog
+    **/
+    signInAddress?: string;
+    /**
+    *   The left positioning offset of the dialog
+    **/
+    leftValue?: number;
+    /**
+    *   A base element which shall be used as reference for positioning the dialog
+    **/
+    anchor?: JQuery;
+}
 export class IdCardDialog extends CommonControls.ModalDialog {
     static IDCARD_LOADED_EVENT: string;
     private _identityType;
     private _operationScope;
     private _$idCardDialog;
-    constructor(options?: any);
-    initializeOptions(options?: any): void;
+    private _scrollTimeout;
+    private _numItemsDisplayed;
+    private _groupMembers;
+    private _$groupMembersContainer;
+    private _pageSize;
+    private _$loading;
+    constructor(options?: IIdentityPickerIdCardDialogOptions);
+    initializeOptions(options?: IIdentityPickerIdCardDialogOptions): void;
     initialize(): void;
+    private _closeOtherInstances(identitier);
+    private _repositionDialog();
     private _getIdentitiesFailure(data);
     private _getIdentitiesSuccess(data);
     private _getThumbnailFailure(data);
@@ -11147,37 +12906,48 @@ export class IdCardDialog extends CommonControls.ModalDialog {
     private _displayIdCard(identity, attributes);
     private _onCloseClick(e?);
     private _onCancelClick(e?);
-    private _createIdentityImageElement(tfsContext, identityId, size);
+    private _createItem(item);
+    private _renderMembersList();
+    private _loadNextPage();
 }
 export interface IIdentityPickerSearchOptions extends Identities_Picker_Services.IIdentityServiceOptions {
     /**
     *   type of identities - one or more of User or Group
     **/
-    identityType?: Identities_Picker_Services.IIdentityType;
+    identityType?: Identities_Picker_Services.IEntityType;
     /**
-    *   scope - one or more of AAD, Local
+    *   scope - one or more of AAD, IMS, Source
     **/
     operationScope?: Identities_Picker_Services.IOperationScope;
     /**
-    *   default identities to initialise the dropdown with
+    *   default identities to initialise the dropdown with - if you are constructing the IEntity objects, their identifiers (such as entityId, localId etc.) have to be valid;
+    *   alternatively the input can be a semi-colon separated sequence of unique identifiers (such as sign-in addresses or aliases)
     **/
-    items?: Identities_Picker_RestClient.IIdentity[];
+    items?: string | Identities_Picker_RestClient.IEntity[];
     /**
     *   parent Jquery object
     **/
-    container?: JQuery;
+    container: JQuery;
     /**
     *   restrict displayed identities in dropdown
     **/
     pageSize?: number;
     /**
+    *   the minimum length of the prefix to start searching the directories - in the absence of an MRU - default 3
+    **/
+    minimumPrefixSize?: number;
+    /**
     *   whether the search and dropdown controls should handle multiple identities
     **/
     multiIdentitySearch?: boolean;
     /**
-    *   what action (usually in parent) should execute when an item in this dropdown is selected
+    *   action that should execute when an item in this dropdown is selected. This action, if supplied, shall be called after the dropdown's default onItemSelect action has executed
     **/
-    onItemSelect?: any;
+    onItemSelect?: (item: Identities_Picker_RestClient.IEntity) => any;
+    /**
+    *   a pre-render hook that takes in the list of identities that would otherwise have been displayed and rearranges or adds to them prior to returning the new list
+    **/
+    preDropdownRender?: (entityList: Identities_Picker_RestClient.IEntity[]) => Identities_Picker_RestClient.IEntity[];
     /**
     *   whether to display the contact card icon for each identity in the dropdown. Default false.
     **/
@@ -11186,35 +12956,57 @@ export interface IIdentityPickerSearchOptions extends Identities_Picker_Services
     *   whether to style the search control with a triangle that displays the MRU on click or not. Default false.
     **/
     showMruTriangle?: boolean;
-    tfsContext?: any;
-    coreCssClass?: string;
+    /**
+    *   whether the dropdown should display the MRU with the search button or just search directories directly. Setting this will also enable the MRU on the dropdown. Default false.
+    **/
+    showMru?: boolean;
+    /**
+    *   the value of the placeholder attribute for the search text box.
+    **/
+    placeholderText?: string;
 }
 export class IdentityPickerSearchControl extends Controls.Control<IIdentityPickerSearchOptions> {
     static INVALID_INPUT_EVENT: string;
     static VALID_INPUT_EVENT: string;
+    /**
+    *   This is currently used to indicate that identity resolution failed.
+    **/
     static DATA_SOURCE_FALLBACK_EVENT: string;
+    /**
+    *   This is currently used to indicate that identity resolution is now succeeding.
+    **/
     static DATA_SOURCE_REEVALUATE_EVENT: string;
     static SEARCH_STARTED_EVENT: string;
     static SEARCH_FINISHED_EVENT: string;
+    private static DEFAULT_HEIGHT;
+    private static DEFAULT_WIDTH;
     private _identityPickerDropdown;
     private _identityType;
     private _operationScope;
     private _selectedItems;
     private _unresolvedItems;
     private _$input;
+    private _$container;
+    private _$mruTriangle;
     private _searchTerm;
     private _$focusedOn;
     private _typingTimer;
     private _doneTypingInterval;
-    private _containerHeight;
+    private _controlHeight;
+    private _controlWidth;
     private _elementMargin;
     private _scrollBarWidth;
     private _triangleWidth;
+    private _minimumPrefixSize;
+    private _preDropdownRender;
+    private _placeholderText;
+    private _blurTracker;
     constructor(options?: IIdentityPickerSearchOptions);
     initialize(): void;
     getIdentitySearchResult(): IdentitySearchResult;
     clear(): void;
     isDropdownVisible(): boolean;
+    addIdentitiesToMru(identities: Identities_Picker_RestClient.IEntity[]): void;
     private _showProgressCursor();
     private _stopProgressCursor();
     private _fireInvalidInput();
@@ -11223,7 +13015,7 @@ export class IdentityPickerSearchControl extends Controls.Control<IIdentityPicke
     private _fireDataSourceReevaluate();
     private _onInputChange(e?);
     private _onInputClick(e?);
-    private _onDropClick(e?);
+    private _onMruTriangleClick(e?);
     private _onInputBlur(e?);
     private _onInputKeyDown(e?);
     private _onInputKeyUp(e?);
@@ -11236,40 +13028,60 @@ export class IdentityPickerSearchControl extends Controls.Control<IIdentityPicke
     private _recalculateInputWidth();
     private _replaceAndCleanup(email);
     private _findInSelectedItems(object);
-    private _showUserIdCard(args);
+    private _showIdCardDialog(args);
     private _resolveItem(item, clearInput?, prefix?);
     private _getSearchPrefix(input);
     private _unresolveItem(token);
 }
 export interface IdentitySearchResult {
-    resolvedIdentities: Identities_Picker_RestClient.IIdentity[];
-    unresolvedIdentities: string[];
+    resolvedEntities: Identities_Picker_RestClient.IEntity[];
+    unresolvedQueryTokens: string[];
 }
 }
 declare module "VSS/Identities/Picker/RestClient" {
 import WebApi_RestClient = require("VSS/WebApi/RestClient");
 export class AbstractIdentityPickerHttpClient extends WebApi_RestClient.VssHttpClient {
     beginGetIdentities(identitiesRequest: IdentitiesSearchRequestModel): IPromise<IdentitiesSearchResponseModel>;
-    beginGetAvatar(objectId: string): IPromise<IdentitiesGetAvatarResponseModel>;
+    beginGetIdentityImageLocation(objectId: string): IPromise<string>;
+    beginGetConnections(objectId: string, getRequestParams: IdentitiesGetConnectionsRequestModel): IPromise<IdentitiesGetConnectionsResponseModel>;
+    beginGetIdentityFeatureMru(identityId: string, featureId: string, getRequestParams: IdentitiesGetMruRequestModel): IPromise<IdentitiesGetMruResponseModel>;
+    beginPatchIdentityFeatureMru(identityId: string, featureId: string, patchRequestBody: IdentitiesPatchMruAction[]): IPromise<IdentitiesPatchMruResponseModel>;
 }
 export class CommonIdentityPickerHttpClient extends AbstractIdentityPickerHttpClient {
+    private static _identityImageLocation;
     beginGetIdentities(identitiesRequest: IdentitiesSearchRequestModel): IPromise<IdentitiesSearchResponseModel>;
-    beginGetAvatar(objectId: string): IPromise<IdentitiesGetAvatarResponseModel>;
-}
-export class AbstractMruServiceHttpClient extends WebApi_RestClient.VssHttpClient {
-    beginGetIdentities(identitiesRequest: IdentitiesSearchRequestModel): IPromise<any>;
+    beginGetIdentityImageLocation(objectId: string): IPromise<string>;
+    beginGetConnections(objectId: string, getRequestParams: IdentitiesGetConnectionsRequestModel): IPromise<IdentitiesGetConnectionsResponseModel>;
+    beginGetIdentityFeatureMru(identityId: string, featureId: string, getRequestParams: IdentitiesGetMruRequestModel): IPromise<IdentitiesGetMruResponseModel>;
+    beginPatchIdentityFeatureMru(identityId: string, featureId: string, patchRequestBody: IdentitiesPatchMruAction[]): IPromise<IdentitiesPatchMruResponseModel>;
 }
 /**
  *   Identity Picker Models
 **/
-export interface IIdentity {
-    objectId: string;
-    objectType: string;
+export interface IEntity {
+    /**
+    *   Always set. Not to be parsed as any non-string type.
+    **/
+    entityId: string;
+    /**
+    *   Always set. e.g. user or group
+    **/
+    entityType: string;
+    /**
+    *   Always set. e.g. vsd or aad
+    **/
     originDirectory: string;
+    /**
+    *   Always set. e.g. the objectId in case of AAD sourced entities or the vsid in case of non-AAD-backed VSId entities.
+    **/
     originId: string;
-    localDirectory: string;
-    localId: string;
+    localDirectory?: string;
+    localId?: string;
+    /**
+    *   Always set.
+    **/
     displayName?: string;
+    scopeName?: string;
     department?: string;
     jobTitle?: string;
     mail?: string;
@@ -11281,11 +13093,15 @@ export interface IIdentity {
     description?: string;
     image?: string;
     manager?: string;
+    /**
+    *   The isMru field denotes whether this identity was loaded via a MruService operation or an IdentityService operation.
+    *   Furthermore, this should not be set for identities that were constructed (for constants etc.)
+    **/
     isMru?: boolean;
 }
 export interface QueryTokenResultModel {
     queryToken: string;
-    identities: IIdentity[];
+    identities: IEntity[];
     pagingToken?: string;
 }
 export interface IdentitiesSearchRequestModel {
@@ -11302,6 +13118,33 @@ export interface IdentitiesSearchResponseModel {
 export interface IdentitiesGetAvatarResponseModel {
     avatar: string;
 }
+export interface IdentitiesGetConnectionsRequestModel {
+    connectionTypes: string[];
+    identityTypes: string[];
+    operationScopes: string[];
+    depth?: number;
+    options?: any;
+    pagingToken?: string;
+    properties?: string[];
+}
+export interface IdentitiesGetConnectionsResponseModel {
+    successors?: IEntity[];
+}
+export interface IdentitiesGetMruRequestModel {
+    operationScopes: string[];
+    properties?: string[];
+}
+export interface IdentitiesGetMruResponseModel {
+    mruIdentities: IEntity[];
+}
+export interface IdentitiesPatchMruAction {
+    op: string;
+    value: string[];
+    operationScopes: string[];
+}
+export interface IdentitiesPatchMruResponseModel {
+    result: boolean;
+}
 }
 declare module "VSS/Identities/Picker/Services" {
 import Identities_Picker_RestClient = require("VSS/Identities/Picker/RestClient");
@@ -11311,85 +13154,117 @@ import Service = require("VSS/Service");
 **/
 export interface IOperationScope {
     /**
-    *   Search the local directory - IMS (Identity service)
-    **/
-    Local?: boolean;
-    /**
     *   Search the applicable source directory - AAD tenant-level for AAD-backed accounts or IMS account-level for MSA accounts/on-premise TFS
     **/
     Source?: boolean;
+    /**
+    *   Search IMS (Identity service)
+    **/
+    IMS?: boolean;
+    /**
+    *   Search AAD
+    **/
     AAD?: boolean;
-    Mru?: boolean;
 }
 /**
 *   Maps to static DirectoryObjectType in the DirectoryDiscoveryService
 **/
-export interface IIdentityType {
+export interface IEntityType {
     User?: boolean;
     Group?: boolean;
+}
+/**
+*  The kinds of edges in the identity directed graph that you want to traverse
+**/
+export interface IConnectionType {
+    successors?: boolean;
+}
+/**
+*   These client service helpers are meant to be used only by the framework identity picker controls and services and should not be used elsewhere.
+**/
+export class ServiceHelpers {
+    static _defaultProperties: string[];
+    static _defaultUserProperties: string[];
+    static _defaultGroupProperties: string[];
+    static DefaultUserImage: string;
+    static DefaultVsoGroupImage: string;
+    static DefaultAadGroupImage: string;
+    /**
+    *   Currently supports only AAD and Source (AAD for AAD-backed accounts, and IMS for MSA accounts/on-premise TFS)
+    **/
+    static getOperationScopeList(operationScope: IOperationScope): string[];
+    /**
+    *   Currently supports only Users and Groups
+    **/
+    static getIdentityTypeList(identityType: IEntityType): string[];
+    /**
+    *   Currently supports only Successors
+    **/
+    static getConnectionTypeList(connectionType: IConnectionType): string[];
+    static getDefaultIdentityImage(identity: Identities_Picker_RestClient.IEntity): string;
 }
 export interface IIdentityServiceOptions {
     /**
     *   The httpClient that should be used instead of the CommonIdentityPickerHttpClient
     **/
     httpClient?: Identities_Picker_RestClient.AbstractIdentityPickerHttpClient;
+    /**
+    *   The minimum results that need to be fetched
+    **/
+    minResults?: number;
+    /**
+    *   The maximum results that need to be fetched
+    **/
+    maxResults?: number;
 }
 export interface IIdentityService {
-    getIdentities(prefix: string, operationScope: IOperationScope, identityType: IIdentityType, successCallback: (queryTokenResult: Identities_Picker_RestClient.QueryTokenResultModel) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
-    getIdentityImages(identities: Identities_Picker_RestClient.IIdentity[], operationScope: IOperationScope, identityType: IIdentityType, successCallback: (images: IDictionaryStringTo<string>) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
+    getIdentities(prefix: string, operationScope: IOperationScope, identityType: IEntityType, successCallback: (queryTokenResult: Identities_Picker_RestClient.QueryTokenResultModel) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
+    getIdentityImages(identities: Identities_Picker_RestClient.IEntity[], operationScope: IOperationScope, identityType: IEntityType, successCallback: (images: IDictionaryStringTo<string>) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
+    getIdentityConnections(identity: Identities_Picker_RestClient.IEntity, operationScope: IOperationScope, identityType: IEntityType, connectionType: IConnectionType, options?: IIdentityServiceOptions): IPromise<Identities_Picker_RestClient.IdentitiesGetConnectionsResponseModel>;
 }
+/**
+*   This client service is meant to be used only by the framework identity picker controls and should not be used elsewhere.
+**/
 export class IdentityService extends Service.VssService implements IIdentityService {
-    private static _defaultProperties;
-    private static _defaultUserProperties;
-    private static _defaultGroupProperties;
     /**
     *   Get all users with specific properties starting with the prefix.
-    *   @param  successCallback:    This is called independently for each semicolon separated queryToken that is parsed by the service and resolved to 0 or more identities
+    *   @param  successCallback:    This is called independently for each valid semicolon separated queryToken that was parsed by the service and resolved to 0 or more identities.
     *   @param  errorCallback:      This is called for each error received from either the controller or one of the federated services
     **/
-    getIdentities(prefix: string, operationScope: IOperationScope, identityType: IIdentityType, successCallback: (queryTokenResult: Identities_Picker_RestClient.QueryTokenResultModel) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
-    /**
-    *   Currently supports only AAD and Source (AAD for AAD-backed accounts, and IMS for MSA accounts/on-premise TFS)
-    **/
-    private static getOperationScopeList(operationScope);
-    /**
-    *   Currently supports only Users and Groups
-    **/
-    private static getIdentityTypeList(identityType);
-    private static getQueryTokensForIdentitesWithImages(identities);
+    getIdentities(prefix: string, operationScope: IOperationScope, identityType: IEntityType, successCallback: (queryTokenResult: Identities_Picker_RestClient.QueryTokenResultModel) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
     /**
     *   Get images of identities asynchronously, if available. Currently only supports AAD and profile images.
     *   @param  successCallback:    This is called once all the images have been loaded for the identities supplied
     *   @param  errorCallback:      This is called for each error received from either the controller or one of the federated services
     **/
-    getIdentityImages(identities: Identities_Picker_RestClient.IIdentity[], operationScope: IOperationScope, identityType: IIdentityType, successCallback: (images: IDictionaryStringTo<string>) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
+    getIdentityImages(identities: Identities_Picker_RestClient.IEntity[], successCallback: (images: IDictionaryStringTo<string>) => void, errorCallback?: (errorData?: any) => void, options?: IIdentityServiceOptions): void;
+    /**
+    *   Get an identity's connections in the overlay of the AD graph on the VSO Identity graph
+    **/
+    getIdentityConnections(identity: Identities_Picker_RestClient.IEntity, operationScope: IOperationScope, identityType: IEntityType, connectionType: IConnectionType, options?: IIdentityServiceOptions): IPromise<Identities_Picker_RestClient.IdentitiesGetConnectionsResponseModel>;
+    private static getQueryTokensForIdentitesWithImages(identities);
 }
-export interface IUserMruServiceOptions {
+export interface IMruServiceOptions {
     /**
     *   The httpClient that should be used instead of the CommonIdentityPickerHttpClient
     **/
-    httpClient?: Identities_Picker_RestClient.AbstractMruServiceHttpClient;
-}
-export interface MruScope {
-    /**
-    *   Identities in the current account that have been "bound" using the SPS Identity service
-    **/
-    AccountBound: string;
+    httpClient?: Identities_Picker_RestClient.AbstractIdentityPickerHttpClient;
 }
 /**
-*   Returns MRU identities (across all IdentityTypeFilters) for the querying user at the specified scope (currently IMS Account bind-pended identities only)
+*   Operations on the account-bound MRU identities (across all IdentityTypeFilters) of the querying user in its account
 **/
-export interface IUserMruService {
-    getIdentities(prefix: string, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<Identities_Picker_RestClient.IIdentity[]>;
-    getIdentity(objectId: string, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<Identities_Picker_RestClient.IIdentity>;
-    removeIdentity(objectId: string, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<boolean>;
-    addIdentity(identity: Identities_Picker_RestClient.IIdentity, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<boolean>;
+export interface IMruService {
+    getMruIdentities(operationScope: IOperationScope, identityId?: string, featureId?: string, options?: IMruServiceOptions): IPromise<Identities_Picker_RestClient.IEntity[]>;
+    removeMruIdentities(objectIds: string[], operationScope: IOperationScope, identityId?: string, featureId?: string, options?: IMruServiceOptions): IPromise<boolean>;
+    addMruIdentities(objectIds: string[], operationScope: IOperationScope, identityId?: string, featureId?: string, options?: IMruServiceOptions): IPromise<boolean>;
 }
-export class UserMruService extends Service.VssService implements IUserMruService {
-    getIdentities(prefix: string, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<Identities_Picker_RestClient.IIdentity[]>;
-    getIdentity(objectId: string, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<Identities_Picker_RestClient.IIdentity>;
-    removeIdentity(objectId: string, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<boolean>;
-    addIdentity(identity: Identities_Picker_RestClient.IIdentity, operationScope: MruScope, options?: IUserMruServiceOptions): IPromise<boolean>;
+/**
+*   This client service is meant to be used only by the framework identity picker controls and should not be used elsewhere.
+**/
+export class MruService extends Service.VssService implements IMruService {
+    getMruIdentities(operationScope: IOperationScope, identityId?: string, featureId?: string, options?: IMruServiceOptions): IPromise<Identities_Picker_RestClient.IEntity[]>;
+    removeMruIdentities(objectIds: string[], operationScope: IOperationScope, identityId?: string, featureId?: string, options?: IMruServiceOptions): IPromise<boolean>;
+    addMruIdentities(objectIds: string[], operationScope: IOperationScope, identityId?: string, featureId?: string, options?: IMruServiceOptions): IPromise<boolean>;
 }
 }
 declare module "VSS/Identities/RestClient" {
@@ -11400,16 +13275,22 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {any} container
      * @return IPromise<Contracts.Identity[]>
      */
     createGroups(container: any): IPromise<Contracts.Identity[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} groupId
      * @return IPromise<void>
      */
     deleteGroup(groupId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} scopeIds
      * @param {boolean} recurse
      * @param {boolean} deleted
@@ -11418,6 +13299,8 @@ export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
      */
     listGroups(scopeIds?: string, recurse?: boolean, deleted?: boolean, properties?: string): IPromise<Contracts.Identity[]>;
     /**
+     * [Preview API]
+     *
      * @param {number} identitySequenceId
      * @param {number} groupSequenceId
      * @param {string} scopeId
@@ -11425,6 +13308,8 @@ export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getIdentityChanges(identitySequenceId: number, groupSequenceId: number, scopeId?: string): IPromise<Contracts.ChangedIdentities>;
     /**
+     * [Preview API]
+     *
      * @param {string} descriptors
      * @param {string} identityIds
      * @param {string} searchFilter
@@ -11437,6 +13322,8 @@ export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
      */
     readIdentities(descriptors?: string, identityIds?: string, searchFilter?: string, filterValue?: string, queryMembership?: Contracts.QueryMembership, properties?: string, includeRestrictedVisibility?: boolean, options?: Contracts.ReadIdentitiesOptions): IPromise<Contracts.Identity[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} scopeId
      * @param {Contracts.QueryMembership} queryMembership
      * @param {string} properties
@@ -11444,6 +13331,8 @@ export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
      */
     readIdentitiesByScope(scopeId: string, queryMembership?: Contracts.QueryMembership, properties?: string): IPromise<Contracts.Identity[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} identityId
      * @param {Contracts.QueryMembership} queryMembership
      * @param {string} properties
@@ -11451,42 +13340,58 @@ export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
      */
     readIdentity(identityId: string, queryMembership?: Contracts.QueryMembership, properties?: string): IPromise<Contracts.Identity>;
     /**
+     * [Preview API]
+     *
      * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.Identity[]>} identities
      * @return IPromise<Contracts.IdentityUpdateData[]>
      */
     updateIdentities(identities: VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.Identity[]>): IPromise<Contracts.IdentityUpdateData[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.Identity} identity
      * @param {string} identityId
      * @return IPromise<void>
      */
     updateIdentity(identity: Contracts.Identity, identityId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.FrameworkIdentityInfo} frameworkIdentityInfo
      * @return IPromise<Contracts.Identity>
      */
     createIdentity(frameworkIdentityInfo: Contracts.FrameworkIdentityInfo): IPromise<Contracts.Identity>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.IdentityBatchInfo} batchInfo
      * @return IPromise<Contracts.Identity[]>
      */
     readIdentityBatch(batchInfo: Contracts.IdentityBatchInfo): IPromise<Contracts.Identity[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} scopeId
      * @return IPromise<Contracts.IdentitySnapshot>
      */
     getIdentitySnapshot(scopeId: string): IPromise<Contracts.IdentitySnapshot>;
     /**
+     * [Preview API]
+     *
      * @return IPromise<Contracts.IdentitySelf>
      */
     getSelf(): IPromise<Contracts.IdentitySelf>;
     /**
+     * [Preview API]
+     *
      * @param {string} containerId
      * @param {string} memberId
      * @return IPromise<boolean>
      */
     addMember(containerId: string, memberId: string): IPromise<boolean>;
     /**
+     * [Preview API]
+     *
      * @param {string} containerId
      * @param {string} memberId
      * @param {Contracts.QueryMembership} queryMembership
@@ -11494,18 +13399,24 @@ export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
      */
     readMember(containerId: string, memberId: string, queryMembership?: Contracts.QueryMembership): IPromise<Contracts.IdentityDescriptor>;
     /**
+     * [Preview API]
+     *
      * @param {string} containerId
      * @param {Contracts.QueryMembership} queryMembership
      * @return IPromise<Contracts.IdentityDescriptor[]>
      */
     readMembers(containerId: string, queryMembership?: Contracts.QueryMembership): IPromise<Contracts.IdentityDescriptor[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} containerId
      * @param {string} memberId
      * @return IPromise<boolean>
      */
     removeMember(containerId: string, memberId: string): IPromise<boolean>;
     /**
+     * [Preview API]
+     *
      * @param {string} memberId
      * @param {string} containerId
      * @param {Contracts.QueryMembership} queryMembership
@@ -11513,43 +13424,59 @@ export class IdentitiesHttpClient extends VSS_WebApi.VssHttpClient {
      */
     readMemberOf(memberId: string, containerId: string, queryMembership?: Contracts.QueryMembership): IPromise<Contracts.IdentityDescriptor>;
     /**
+     * [Preview API]
+     *
      * @param {string} memberId
      * @param {Contracts.QueryMembership} queryMembership
      * @return IPromise<Contracts.IdentityDescriptor[]>
      */
     readMembersOf(memberId: string, queryMembership?: Contracts.QueryMembership): IPromise<Contracts.IdentityDescriptor[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.CreateScopeInfo} info
      * @param {string} scopeId
      * @return IPromise<Contracts.IdentityScope>
      */
     createScope(info: Contracts.CreateScopeInfo, scopeId: string): IPromise<Contracts.IdentityScope>;
     /**
+     * [Preview API]
+     *
      * @param {string} scopeId
      * @return IPromise<void>
      */
     deleteScope(scopeId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} scopeId
      * @return IPromise<Contracts.IdentityScope>
      */
     getScopeById(scopeId: string): IPromise<Contracts.IdentityScope>;
     /**
+     * [Preview API]
+     *
      * @param {string} scopeName
      * @return IPromise<Contracts.IdentityScope>
      */
     getScopeByName(scopeName: string): IPromise<Contracts.IdentityScope>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.IdentityScope} renameScope
      * @param {string} scopeId
      * @return IPromise<void>
      */
     renameScope(renameScope: Contracts.IdentityScope, scopeId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @return IPromise<VSS_DelegatedAuthorization_Contracts.AccessTokenResult>
      */
     getSignoutToken(): IPromise<VSS_DelegatedAuthorization_Contracts.AccessTokenResult>;
     /**
+     * [Preview API]
+     *
      * @param {string} tenantId
      * @return IPromise<Contracts.TenantInfo>
      */
@@ -11575,7 +13502,7 @@ export interface ContentLocationOptions {
     */
     hostType?: Contracts_Platform.ContextHostType;
     /**
-    * Relative path to append to the url
+    * Relative path to append to the url. This needs to be properly encoded by the consumer.
     */
     relativePath?: string;
     /**
@@ -11695,28 +13622,28 @@ export interface AccessMapping {
     moniker: string;
 }
 /**
-* Data transfer class that holds information needed to set up a connection with a VSS server.
-*/
+ * Data transfer class that holds information needed to set up a connection with a VSS server.
+ */
 export interface ConnectionData {
     /**
-    * The Id of the authenticated user who made this request. More information about the user can be obtained by passing this Id to the Identity service
-    */
+     * The Id of the authenticated user who made this request. More information about the user can be obtained by passing this Id to the Identity service
+     */
     authenticatedUser: VSS_Identities_Contracts.Identity;
     /**
-    * The Id of the authorized user who made this request. More information about the user can be obtained by passing this Id to the Identity service
-    */
+     * The Id of the authorized user who made this request. More information about the user can be obtained by passing this Id to the Identity service
+     */
     authorizedUser: VSS_Identities_Contracts.Identity;
     /**
-    * The instance id for this server.
-    */
+     * The instance id for this server.
+     */
     instanceId: string;
     /**
-    * Data that the location service holds.
-    */
+     * Data that the location service holds.
+     */
     locationServiceData: LocationServiceData;
     /**
-    * The virtual directory of the host we are talking to.
-    */
+     * The virtual directory of the host we are talking to.
+     */
     webApplicationRelativeDirectory: string;
 }
 export enum InheritLevel {
@@ -11731,40 +13658,40 @@ export interface LocationMapping {
     location: string;
 }
 /**
-* Data transfer class used to transfer data about the location service data over the web service.
-*/
+ * Data transfer class used to transfer data about the location service data over the web service.
+ */
 export interface LocationServiceData {
     /**
-    * Data about the access mappings contained by this location service.
-    */
+     * Data about the access mappings contained by this location service.
+     */
     accessMappings: AccessMapping[];
     /**
-    * Data that the location service holds.
-    */
+     * Data that the location service holds.
+     */
     clientCacheFresh: boolean;
     /**
-    * The time to live on the location service cache.
-    */
+     * The time to live on the location service cache.
+     */
     clientCacheTimeToLive: number;
     /**
-    * The default access mapping moniker for the server.
-    */
+     * The default access mapping moniker for the server.
+     */
     defaultAccessMappingMoniker: string;
     /**
-    * The obsolete id for the last change that took place on the server (use LastChangeId64).
-    */
+     * The obsolete id for the last change that took place on the server (use LastChangeId64).
+     */
     lastChangeId: number;
     /**
-    * The non-truncated 64-bit id for the last change that took place on the server.
-    */
+     * The non-truncated 64-bit id for the last change that took place on the server.
+     */
     lastChangeId64: number;
     /**
-    * Data about the service definitions contained by this location service.
-    */
+     * Data about the service definitions contained by this location service.
+     */
     serviceDefinitions: ServiceDefinition[];
     /**
-    * The identifier of the deployment which is hosting this location data (e.g. SPS, TFS, ELS, Napa, etc.)
-    */
+     * The identifier of the deployment which is hosting this location data (e.g. SPS, TFS, ELS, Napa, etc.)
+     */
     serviceOwner: string;
 }
 export enum RelativeToSetting {
@@ -11779,12 +13706,12 @@ export interface ServiceDefinition {
     inheritLevel: InheritLevel;
     locationMappings: LocationMapping[];
     /**
-    * Maximum api version that this resource supports (current server version for this resource). Copied from ApiResourceLocation.
-    */
+     * Maximum api version that this resource supports (current server version for this resource). Copied from ApiResourceLocation.
+     */
     maxVersion: string;
     /**
-    * Minimum api version that this resource supports. Copied from ApiResourceLocation.
-    */
+     * Minimum api version that this resource supports. Copied from ApiResourceLocation.
+     */
     minVersion: string;
     parentIdentifier: string;
     parentServiceType: string;
@@ -11792,12 +13719,12 @@ export interface ServiceDefinition {
     relativePath: string;
     relativeToSetting: RelativeToSetting;
     /**
-    * The latest version of this resource location that is in &quot;Release&quot; (non-preview) mode. Copied from ApiResourceLocation.
-    */
+     * The latest version of this resource location that is in "Release" (non-preview) mode. Copied from ApiResourceLocation.
+     */
     releasedVersion: string;
     /**
-    * The current resource version supported by this resource location. Copied from ApiResourceLocation.
-    */
+     * The current resource version supported by this resource location. Copied from ApiResourceLocation.
+     */
     resourceVersion: number;
     serviceType: string;
     status: ServiceStatus;
@@ -11855,7 +13782,7 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class LocationsHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
-     * This was copied and adapted from TeamFoundationConnectionService.Connect()
+     * [Preview API] This was copied and adapted from TeamFoundationConnectionService.Connect()
      *
      * @param {VSS_Common_Contracts.ConnectOptions} connectOptions
      * @param {number} lastChangeId - Obsolete 32-bit LastChangeId
@@ -11864,23 +13791,31 @@ export class LocationsHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getConnectionData(connectOptions?: VSS_Common_Contracts.ConnectOptions, lastChangeId?: number, lastChangeId64?: number): IPromise<Contracts.ConnectionData>;
     /**
+     * [Preview API]
+     *
      * @param {string} serviceType
      * @param {string} identifier
      * @return IPromise<void>
      */
     deleteServiceDefinition(serviceType: string, identifier: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} serviceType
      * @param {string} identifier
      * @return IPromise<Contracts.ServiceDefinition>
      */
     getServiceDefinition(serviceType: string, identifier: string): IPromise<Contracts.ServiceDefinition>;
     /**
+     * [Preview API]
+     *
      * @param {string} serviceType
      * @return IPromise<Contracts.ServiceDefinition[]>
      */
     getServiceDefinitions(serviceType?: string): IPromise<Contracts.ServiceDefinition[]>;
     /**
+     * [Preview API]
+     *
      * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.ServiceDefinition[]>} serviceDefinitions
      * @return IPromise<void>
      */
@@ -11889,55 +13824,55 @@ export class LocationsHttpClient extends VSS_WebApi.VssHttpClient {
 }
 declare module "VSS/Operations/Contracts" {
 /**
-* Represents an async operation and its progress or result information.
-*/
+ * Represents an async operation and its progress or result information.
+ */
 export interface Operation extends OperationReference {
     /**
-    * The links to other objects related to this object.
-    */
+     * The links to other objects related to this object.
+     */
     _links: any;
 }
 /**
-* Reference for an async operation.
-*/
+ * Reference for an async operation.
+ */
 export interface OperationReference {
     /**
-    * The identifier for this operation.
-    */
+     * The identifier for this operation.
+     */
     id: string;
     /**
-    * The current status of the operation.
-    */
+     * The current status of the operation.
+     */
     status: OperationStatus;
     /**
-    * Url to get the full object.
-    */
+     * Url to get the full object.
+     */
     url: string;
 }
 export enum OperationStatus {
     /**
-    * The operation object does not have the status set.
-    */
+     * The operation object does not have the status set.
+     */
     NotSet = 0,
     /**
-    * The operation has been queued.
-    */
+     * The operation has been queued.
+     */
     Queued = 1,
     /**
-    * The operation is in progress.
-    */
+     * The operation is in progress.
+     */
     InProgress = 2,
     /**
-    * The operation was cancelled by the user.
-    */
+     * The operation was cancelled by the user.
+     */
     Cancelled = 3,
     /**
-    * The operation completed successfully.
-    */
+     * The operation completed successfully.
+     */
     Succeeded = 4,
     /**
-    * The operation completed with a failure.
-    */
+     * The operation completed with a failure.
+     */
     Failed = 5,
 }
 export var TypeInfo: {
@@ -11965,7 +13900,7 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class OperationsHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
-     * Gets an operation from the the Id.
+     * [Preview API] Gets an operation from the the Id.
      *
      * @param {string} operationId - The id for the operation.
      * @return IPromise<Contracts.Operation>
@@ -11973,28 +13908,28 @@ export class OperationsHttpClient extends VSS_WebApi.VssHttpClient {
     getOperation(operationId: string): IPromise<Contracts.Operation>;
 }
 }
-declare module "VSS/SDK.Host" {
+declare module "VSS/SDK/Services/Dialogs" {
 import CommonControls = require("VSS/Controls/Common");
 /**
 * Class which manages showing dialogs in the parent frame
+* @serviceId "vss.dialogs"
 */
 export class HostDialogService implements IHostDialogService {
     /**
     * Open a modal dialog in the host frame which will get its content from a contributed control.
     *
-    * @param contribution url for dialog contents
+    * @param contributionId The id of the control contribution to host in the dialog
     * @param dialogOptions options.title - title of dialog
     * @param contributionConfig Initial configuration to pass to the contribution control.
     * @param postContent Optional data to post to the contribution endpoint. If not specified, a GET request will be performed.
     */
-    openDialog(contribution: IContribution, dialogOptions: IHostDialogOptions, contributionConfig?: Object, postContent?: Object): IPromise<IExternalDialog>;
+    openDialog(contributionId: string, dialogOptions: IHostDialogOptions, contributionConfig?: Object, postContent?: Object): IPromise<IExternalDialog>;
 }
 /**
 * Represents a dialog which hosts an ExternalPart.
 */
 export class ExternalDialog extends CommonControls.ModalDialog implements IExternalDialog {
     private _loadingPromise;
-    private _contribution;
     initializeOptions(options?: any): void;
     initialize(): void;
     /**
@@ -12007,20 +13942,114 @@ export class ExternalDialog extends CommonControls.ModalDialog implements IExter
     getContributionInstance<T>(instanceId: string, contextData?: any): IPromise<T>;
     onOkClick(e?: JQueryEventObject): any;
 }
+}
+declare module "VSS/SDK/Services/ExtensionData" {
+import Contracts_Platform = require("VSS/Common/Contracts/Platform");
 /**
-* Class which manages history of the parent frame
+* Provides a wrapper around the REST client for getting and saving extension setting values
+* @serviceId "vss.extensionSettings"
 */
-export class HostHistoryManager implements IHostHistoryService {
+export class ExtensionDataService implements IExtensionDataService {
+    private _extensionManagementClient;
+    private _extensionId;
+    private static DEFAULT_SCOPE_TYPE;
+    private static CURRENT_DEFAULT_SCOPE_VALUE;
+    private static USER_SCOPE_TYPE;
+    private static CURRENT_USER_SCOPE_VALUE;
+    private static SETTINGS_COLLECTION_NAME;
+    private static _serviceInstances;
+    constructor(extensionId: string, webContext: Contracts_Platform.WebContext);
+    /**
+    * Factory method for creating/getting an instance of the extension settings service.
+    *
+    * @param extensionId The extension id to get or save settings for
+    */
+    static getServiceInstance(extensionId: string, webContext?: Contracts_Platform.WebContext): ExtensionDataService;
+    /**
+    * Returns a promise for retrieving a setting at the provided key and scope
+    *
+    * @param key The key to retrieve a value for
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    getValue<T>(key: string, documentOptions?: IDocumentOptions): IPromise<T>;
+    /**
+    * Returns a promise for saving a setting at the provided key and scope
+    *
+    * @param key The key to save a value for
+    * @param value The value to save
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    setValue<T>(key: string, value: T, documentOptions?: IDocumentOptions): IPromise<T>;
+    /**
+    * Returns a promise for getting a document with the provided id in the provided collection
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param id The id of the document in the collection
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    getDocument(collectionName: string, id: string, documentOptions?: IDocumentOptions): IPromise<any>;
+    /**
+    * Returns a promise for getting all of the documents in the provided collection
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    getDocuments(collectionName: string, documentOptions?: IDocumentOptions): IPromise<any[]>;
+    /**
+    * Returns a promise for creating a document in the provided collection
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param doc The document to store
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    createDocument(collectionName: string, doc: any, documentOptions?: IDocumentOptions): IPromise<any>;
+    /**
+    * Returns a promise for setting a document in the provided collection
+    * Creates the document if it does not exist, otherwise updates the existing document with the id provided
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param doc The document to store
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    setDocument(collectionName: string, doc: any, documentOptions?: IDocumentOptions): IPromise<any>;
+    /**
+    * Returns a promise for updating a document in the provided collection
+    * A document with the id provided must exist
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param doc The document to store
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    updateDocument(collectionName: string, doc: any, documentOptions?: IDocumentOptions): IPromise<any>;
+    /**
+    * Returns a promise for deleting the document at the provided scope, collection and id
+    *
+    * @param collectionName The name of the collection where the document lives
+    * @param id The id of the document in the collection
+    * @param documentOptions The scope in which the value is stored - default value is account-wide
+    */
+    deleteDocument(collectionName: string, id: string, documentOptions?: IDocumentOptions): IPromise<void>;
+    private _checkDocumentOptions(documentOptions);
+}
+}
+declare module "VSS/SDK/Services/Navigation" {
+import Q = require("q");
+/**
+* Service which allows interaction with the browser location and navigation of the host frame
+* @serviceId "ms.vss-web.navigation-service"
+*/
+export class HostNavigationService implements IHostNavigationService {
     /**
     * Add a callback to be invoked each time the hash navigation has changed
     *
     * @param callback Method invoked on each navigation hash change
     */
     onHashChanged(callback: (hash: string) => void): void;
+    private _getHash();
     /**
     * Gets the current hash.
     */
-    getHash(): any;
+    getHash(): Q.Promise<string>;
     /**
      * Reloads the parent frame
      */
@@ -12071,16 +14100,17 @@ export class SearchCore {
 }
 export interface ISearchStrategyOptions {
     specialCharacters?: string[];
-    delimiter?: string;
+    delimiter?: string | RegExp;
 }
 export class SearchStrategy {
     /**
      * Tokenizes the searchText into separate words using a regex.
      *
      * @param searchText The searchText to split up.
+     * @param delimiter The string or regex delimiter to use to split up the search terms
      * @return An array of strings, the separate words.
      */
-    static getTerms(searchText: string[], delimiter?: string): any[];
+    static getTerms(searchText: string[], delimiter?: string | RegExp): any[];
     private _options;
     private _specialCharactersHashSet;
     /**
@@ -12157,11 +14187,15 @@ export class IndexedSearchStrategy extends SearchStrategy {
      */
     dataExists(): boolean;
 }
+export interface IndexedSearchStoreOptions {
+    delimiter?: string | RegExp;
+}
 export class IndexedSearchStore {
+    protected _options: IndexedSearchStoreOptions;
     /**
      *  Abstract function allowing for additional stores for an IndexedSearchStrategy
      */
-    constructor();
+    constructor(options?: IndexedSearchStoreOptions);
     /**
      * Runs a query on the index.
      *
@@ -12187,7 +14221,7 @@ export class IndexedSearchStore {
 }
 export class TrieStore extends IndexedSearchStore {
     private _trie;
-    constructor();
+    constructor(options?: IndexedSearchStoreOptions);
     search(query: string): any[];
     /**
      * Adds an item to the index, under its token and its subparts.
@@ -12202,7 +14236,7 @@ export class TrieStore extends IndexedSearchStore {
 export class InvertedIndexStore extends IndexedSearchStore {
     private _index;
     private _tokenCache;
-    constructor();
+    constructor(options?: IndexedSearchStoreOptions);
     /**
      * Runs a query on the index.
      *
@@ -12294,6 +14328,375 @@ export class SearchableObject {
      * @param term The additional term
      */
     addTerm(term: string): void;
+}
+}
+declare module "VSS/Security/Contracts" {
+import VSS_Identities_Contracts = require("VSS/Identities/Contracts");
+/**
+ * Class for encapsulating the allowed and denied permissions for a given IdentityDescriptor.
+ */
+export interface AccessControlEntry {
+    /**
+     * The set of permission bits that represent the actions that the associated descriptor is allowed to perform.
+     */
+    allow: number;
+    /**
+     * The set of permission bits that represent the actions that the associated descriptor is not allowed to perform.
+     */
+    deny: number;
+    /**
+     * The descriptor for the user this AccessControlEntry applies to.
+     */
+    descriptor: VSS_Identities_Contracts.IdentityDescriptor;
+    /**
+     * This value, when set, reports the inherited and effective information for the associated descriptor. This value is only set on AccessControlEntries returned by the QueryAccessControlList(s) call when its includeExtendedInfo parameter is set to true.
+     */
+    extendedInfo: AceExtendedInformation;
+}
+/**
+ * The AccessControlList class is meant to associate a set of AccessControlEntries with a security token and its inheritance settings.
+ */
+export interface AccessControlList {
+    /**
+     * Storage of permissions keyed on the identity the permission is for.
+     */
+    acesDictionary: {
+        [key: number]: AccessControlEntry;
+    };
+    /**
+     * True if this ACL holds ACEs that have extended information.
+     */
+    includeExtendedInfo: boolean;
+    /**
+     * True if the given token inherits permissions from parents.
+     */
+    inheritPermissions: boolean;
+    /**
+     * The token that this AccessControlList is for.
+     */
+    token: string;
+}
+/**
+ * Holds the inherited and effective permission information for a given AccessControlEntry.
+ */
+export interface AceExtendedInformation {
+    /**
+     * This is the combination of all of the explicit and inherited permissions for this identity on this token.  These are the permissions used when determining if a given user has permission to perform an action.
+     */
+    effectiveAllow: number;
+    /**
+     * This is the combination of all of the explicit and inherited permissions for this identity on this token.  These are the permissions used when determining if a given user has permission to perform an action.
+     */
+    effectiveDeny: number;
+    /**
+     * These are the permissions that are inherited for this identity on this token.  If the token does not inherit permissions this will be 0.  Note that any permissions that have been explicitly set on this token for this identity, or any groups that this identity is a part of, are not included here.
+     */
+    inheritedAllow: number;
+    /**
+     * These are the permissions that are inherited for this identity on this token.  If the token does not inherit permissions this will be 0.  Note that any permissions that have been explicitly set on this token for this identity, or any groups that this identity is a part of, are not included here.
+     */
+    inheritedDeny: number;
+}
+export interface ActionDefinition {
+    /**
+     * The bit mask integer for this action. Must be a power of 2.
+     */
+    bit: number;
+    /**
+     * The localized display name for this action.
+     */
+    displayName: string;
+    /**
+     * The non-localized name for this action.
+     */
+    name: string;
+    /**
+     * The namespace that this action belongs to.  This will only be used for reading from the database.
+     */
+    namespaceId: string;
+}
+/**
+ * Represents a raw access control entry from a remote backing store.
+ */
+export interface RemoteBackingStoreAccessControlEntry {
+    /**
+     * The set of permission bits that represent the actions that the associated descriptor is allowed to perform.
+     */
+    allow: number;
+    /**
+     * The set of permission bits that represent the actions that the associated descriptor is not allowed to perform.
+     */
+    deny: number;
+    /**
+     * The identity for which the access control entry is allowing / denying permission.
+     */
+    identityId: string;
+    /**
+     * The token of the access control list in which this access control entry belongs.
+     */
+    token: string;
+}
+export interface RemoveAccessControlListsRequest {
+    recurse: boolean;
+    tokens: string[];
+}
+export interface RemovePermissionsRequest {
+    identityIds: string[];
+    token: string;
+}
+export interface RenameTokensRequest {
+    renames: TokenRename[];
+}
+/**
+ * Encapsulates the result of a QuerySecurityData call to the backing store.
+ */
+export interface SecurityNamespaceData {
+    /**
+     * The access control entries in this snapshot of the security namespace data.
+     */
+    accessControlEntries: RemoteBackingStoreAccessControlEntry[];
+    /**
+     * Indicates the ACL store whose data is persisted in this SecurityNamespaceData object.
+     */
+    aclStoreId: string;
+    /**
+     * The identity domain for the service host on which this security namespace resides.
+     */
+    identityDomain: string;
+    /**
+     * The sequence ID for this snapshot of or incremental update to the security namespace data.
+     */
+    newSequenceId: number;
+    /**
+     * The list of tokens in the security namespace which have inheritance disabled.
+     */
+    noInheritTokens: string[];
+    /**
+     * If this is a full snapshot of the security namespace data, this value is -1. Otherwise, this instance represents the delta from OldSequenceId to NewSequenceId.
+     */
+    oldSequenceId: number;
+}
+/**
+ * Represents a set of SecurityNamespaceData objects.
+ */
+export interface SecurityNamespaceDataCollection {
+}
+/**
+ * Class for describing the details of a TeamFoundationSecurityNamespace.
+ */
+export interface SecurityNamespaceDescription {
+    /**
+     * The list of actions that this Security Namespace is responsible for securing.
+     */
+    actions: ActionDefinition[];
+    /**
+     * This is the dataspace category that describes where the security information for this SecurityNamespace should be stored.
+     */
+    dataspaceCategory: string;
+    /**
+     * This localized name for this namespace.
+     */
+    displayName: string;
+    elementLength: number;
+    /**
+     * This is the type of the extension that should be loaded from the plugins directory for extending this security namespace.
+     */
+    extensionType: string;
+    /**
+     * If true, the security namespace is remotable, allowing another service to proxy the namespace.
+     */
+    isRemotable: boolean;
+    /**
+     * This non-localized for this namespace.
+     */
+    name: string;
+    /**
+     * The unique identifier for this namespace.
+     */
+    namespaceId: string;
+    /**
+     * The permission bits needed by a user in order to read security data on the Security Namespace.
+     */
+    readPermission: number;
+    /**
+     * If the security tokens this namespace will be operating on need to be split on certain characters to determine its elements that character should be specified here. If not, this value will be the null character.
+     */
+    separatorValue: string;
+    /**
+     * Used to send information about the structure of the security namespace over the web service.
+     */
+    structureValue: number;
+    /**
+     * If true, the security service will expect an ISecurityDataspaceTokenTranslator plugin to exist for this namespace
+     */
+    useTokenTranslator: boolean;
+    /**
+     * The permission bits needed by a user in order to modify security data on the Security Namespace.
+     */
+    writePermission: number;
+}
+export interface SetAccessControlEntriesInfo {
+    accessControlEntries: AccessControlEntry[];
+    merge: boolean;
+    token: string;
+}
+export interface SetAccessControlListsRequest {
+    accessControlEntries: AccessControlEntry[];
+    accessControlLists: AccessControlList[];
+    throwOnInvalidIdentity: boolean;
+}
+export interface SetInheritFlagInfo {
+    inherit: boolean;
+    token: string;
+}
+export interface SetPermissionsRequest {
+    accessControlEntries: AccessControlEntry[];
+    merge: boolean;
+    throwOnInvalidIdentity: boolean;
+    token: string;
+}
+/**
+ * Represents a request to rename a token in a security namespace.
+ */
+export interface TokenRename {
+    /**
+     * True if the existing token should be preserved; false if it should be deleted.
+     */
+    copy: boolean;
+    /**
+     * The desired new name of the token.
+     */
+    newToken: string;
+    /**
+     * The current name of the token.
+     */
+    oldToken: string;
+    /**
+     * True if the scope of the operation should be extended to all child tokens of OldToken; false otherwise.
+     */
+    recurse: boolean;
+}
+export var TypeInfo: {
+    AccessControlEntry: {
+        fields: any;
+    };
+    AccessControlList: {
+        fields: any;
+    };
+    AceExtendedInformation: {
+        fields: any;
+    };
+    ActionDefinition: {
+        fields: any;
+    };
+    RemoteBackingStoreAccessControlEntry: {
+        fields: any;
+    };
+    RemoveAccessControlListsRequest: {
+        fields: any;
+    };
+    RemovePermissionsRequest: {
+        fields: any;
+    };
+    RenameTokensRequest: {
+        fields: any;
+    };
+    SecurityNamespaceData: {
+        fields: any;
+    };
+    SecurityNamespaceDataCollection: {
+        fields: any;
+    };
+    SecurityNamespaceDescription: {
+        fields: any;
+    };
+    SetAccessControlEntriesInfo: {
+        fields: any;
+    };
+    SetAccessControlListsRequest: {
+        fields: any;
+    };
+    SetInheritFlagInfo: {
+        fields: any;
+    };
+    SetPermissionsRequest: {
+        fields: any;
+    };
+    TokenRename: {
+        fields: any;
+    };
+};
+}
+declare module "VSS/Security/RestClient" {
+import Contracts = require("VSS/Security/Contracts");
+import VSS_WebApi = require("VSS/WebApi/RestClient");
+export class SecurityHttpClient extends VSS_WebApi.VssHttpClient {
+    constructor(rootRequestPath: string);
+    /**
+     * [Preview API]
+     *
+     * @param {any} container
+     * @param {string} securityNamespaceId
+     * @return IPromise<number>
+     */
+    removePermissions(container: any, securityNamespaceId: string): IPromise<number>;
+    /**
+     * [Preview API]
+     *
+     * @param {any} container
+     * @param {string} securityNamespaceId
+     * @return IPromise<number>
+     */
+    setPermissions(container: any, securityNamespaceId: string): IPromise<number>;
+    /**
+     * [Preview API]
+     *
+     * @param {any} container
+     * @param {string} securityNamespaceId
+     * @return IPromise<number>
+     */
+    removeAccessControlLists(container: any, securityNamespaceId: string): IPromise<number>;
+    /**
+     * [Preview API]
+     *
+     * @param {any} container
+     * @param {string} securityNamespaceId
+     * @return IPromise<number>
+     */
+    setAccessControlLists(container: any, securityNamespaceId: string): IPromise<number>;
+    /**
+     * [Preview API] Retrieves a SecurityNamespaceData object for the given ACL store in the given security namespace.
+     *
+     * @param {string} securityNamespaceId - The security namespace
+     * @param {string} aclStoreId - The ACL store within the security namespace
+     * @param {number} oldSequenceId - The sequence ID of this ACL store that is already held by the caller; if >= 0 then a delta from oldSequenceId to the current sequence ID of the ACL store will be computed
+     * @return IPromise<Contracts.SecurityNamespaceData>
+     */
+    querySecurityDataAcl(securityNamespaceId: string, aclStoreId: string, oldSequenceId?: number): IPromise<Contracts.SecurityNamespaceData>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} securityNamespaceId
+     * @param {string} token
+     * @param {boolean} inheritFlag
+     * @return IPromise<number>
+     */
+    setInheritFlag(securityNamespaceId: string, token: string, inheritFlag: boolean): IPromise<number>;
+    /**
+     * [Preview API] Retrieves a SecurityNamespaceData object for each ACL store within the given security namespace. Each returned SecurityNamespaceData object has oldSequenceId = -1, indicating that it is a full copy of the ACL store and not a delta. This API does not support the retrieval of deltas.
+     *
+     * @param {string} securityNamespaceId - The security namespace whose ACL stores should be retrieved
+     * @return IPromise<Contracts.SecurityNamespaceDataCollection>
+     */
+    querySecurityDataNamespace(securityNamespaceId: string): IPromise<Contracts.SecurityNamespaceDataCollection>;
+    /**
+     * [Preview API]
+     *
+     * @param {any} container
+     * @param {string} securityNamespaceId
+     * @return IPromise<number>
+     */
+    renameTokens(container: any, securityNamespaceId: string): IPromise<number>;
 }
 }
 declare module "VSS/Serialization" {
@@ -12557,15 +14960,26 @@ export interface CustomerIntelligenceEvent {
         [key: string]: any;
     };
 }
+export enum DelegatedAppTokenType {
+    Session = 0,
+    App = 1,
+}
 export interface WebSessionToken {
     appId: string;
     force: boolean;
     name: string;
     token: string;
+    tokenType: DelegatedAppTokenType;
 }
 export var TypeInfo: {
     CustomerIntelligenceEvent: {
         fields: any;
+    };
+    DelegatedAppTokenType: {
+        enumValues: {
+            "session": number;
+            "app": number;
+        };
     };
     WebSessionToken: {
         fields: any;
@@ -12578,6 +14992,8 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class CustomerIntelligenceHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {Contracts.CustomerIntelligenceEvent[]} events
      * @return IPromise<void>
      */
@@ -12621,18 +15037,150 @@ export class TelemetryEventData {
 */
 export function publishEvent(eventData: TelemetryEventData, immediate?: boolean): void;
 }
-declare module "VSS/Utils/Core" {
-import Contracts_Platform = require("VSS/Common/Contracts/Platform");
-export var OperationCanceledException: string;
-export var utcOffset: number;
-export var timeZoneMap: Contracts_Platform.DaylightSavingsAdjustmentEntry[];
+declare module "VSS/Utils/Array" {
 /**
- * @param parameters
- * @param expectedParameters
- * @param validateParameterCount
- * @return
- */
-export function validateParameters(parameters: any, expectedParameters: any, validateParameterCount?: boolean): Error;
+* Returns the first element of an array that matches the predicate.
+*
+* @param array Array used to perform predicate.
+* @param predicate The Predicate function.
+* @return The first element that matches the predicate.
+*/
+export function first<T>(array: T[], predicate?: (value: T) => boolean): T;
+export function arrayContains<S, T>(value: S, target: T[], comparer?: (s: S, t: T) => boolean): boolean;
+export function arrayEquals<S, T>(source: S[], target: T[], comparer?: (s: S, t: T) => boolean, nullResult?: boolean): boolean;
+/**
+    * Take an array of values and convert it to a dictionary/lookup table.
+    * @param array Values to convert
+    * @param getKey Function to get the key for a given item
+    * @param getValue Optional function to get teh value for a given item (defaults to the item itself)
+    * @param throwOnDuplicateKeys Optional value indicating to throw an error when duplicate keys are present. Otherwise just overwrite any duplicates
+    * @return
+    */
+export function toDictionary<TArray, TValue>(array: TArray[], getKey: (item: TArray, index: number) => string, getValue?: (item: TArray, index: number) => TValue, throwOnDuplicateKeys?: boolean): IDictionaryStringTo<TValue>;
+/**
+    * @param array
+    * @param value
+    * @param comparer
+    * @return
+    */
+export function contains<T>(array: T[], value: T, comparer?: IComparer<any>): boolean;
+/**
+    * @param array
+    * @param predicate
+    * @return
+    */
+export function findIndex<T>(array: T[], predicate: IFunctionPR<T, boolean>): number;
+/**
+    * @param arrayA
+    * @param arrayB
+    * @param comparer
+    * @return
+    */
+export function intersect<T>(arrayA: T[], arrayB: T[], comparer?: IComparer<T>): T[];
+/**
+    * Helper method used to intersect arrays of strings or numbers
+    *
+    * @param arrayA
+    * @param arrayB
+    * @param caseInsensitive
+    * @return
+    */
+export function intersectPrimitives<T>(arrayA: T[], arrayB: T[], caseInsensitive?: boolean): T[];
+/**
+    * @param arrayA
+    * @param arrayB
+    * @param comparer
+    * @return
+    */
+export function union<T>(arrayA: T[], arrayB: T[], comparer?: IComparer<T>): T[];
+/**
+    * Sorts and removes duplicate elements
+    *
+    * @param array
+    * @param comparer
+    * @return
+    */
+export function uniqueSort<T>(array: T[], comparer?: IComparer<T>): T[];
+/**
+    * @param array
+    * @param comparer
+    * @return
+    */
+export function unique<T>(array: T[], comparer?: IComparer<T>): T[];
+/**
+    * @param arrayA
+    * @param arrayB
+    * @param comparer
+    * @return
+    */
+export function subtract<T>(arrayA: T[], arrayB: T[], comparer?: IComparer<T>): T[];
+/**
+    * Reorders an array by moving oldIndex + the "count" next elements to the newIndex in the array
+    *
+    * @param array
+    * @param oldIndex The index of the array element to move
+    * @param newIndex The index of the array to insert the element at
+    * @param count The number of subsequent, contiguous elements to take with the oldIndex in the reorder
+    */
+export function reorder<T>(array: T[], oldIndex: number, newIndex: number, count: number): T[];
+/**
+    * @param array
+    * @param comparer
+    * @return
+    */
+export function flagSorted<T>(array: T[], comparer: IComparer<T>): void;
+/**
+    * @param toArray
+    * @param fromArray
+    * @return
+    */
+export function copySortFlag<T>(toArray: T[], fromArray: T[]): void;
+/**
+    * @param array
+    * @param comparer
+    * @return
+    */
+export function isSorted<T>(array: T[], comparer: IComparer<T>): boolean;
+/**
+    * @param array
+    * @param comparer
+    * @return
+    */
+export function sortIfNotSorted<T>(array: T[], comparer: IComparer<T>): boolean;
+/**
+    * @param array
+    * @return
+    */
+export function clone<T>(array: T[]): T[];
+/**
+    * @param array
+    * @param item
+    * @return
+    */
+export function indexOf<T>(array: T[], item: T): number;
+/**
+    * @param array
+    * @param item
+    */
+export function add<T>(array: T[], item: T): void;
+/**
+    * @param array
+    * @param items
+    */
+export function addRange<T>(array: T[], items: T[]): void;
+/**
+    * @param array
+    * @param item
+    * @return
+    */
+export function remove<T>(array: T[], item: T): boolean;
+/**
+    * @param array
+    */
+export function clear<T>(array: T[]): void;
+}
+declare module "VSS/Utils/Core" {
+export var OperationCanceledException: string;
 /**
  * Wrap a function to ensure that a specific value of 'this' is passed to the function when it is invoked (regardless of the caller).
  *
@@ -12660,9 +15208,6 @@ export function delegate(instance: any, method: Function, data?: any): IArgsFunc
  * @param args
  */
 export function curry(fn: Function, ...args: any[]): IArgsFunctionR<any>;
-export function transformError(errorCallback?: IErrorCallback, message?: string, errorInfo?: any): IFunctionPR<MSAjaxError, void>;
-export function transformError(errorCallback?: IErrorCallback, transform?: Function, errorInfo?: any): IFunctionPR<MSAjaxError, void>;
-export function keys(obj: IDictionaryStringTo<any>, all?: boolean): string[];
 export class DelayedFunction {
     private _interval;
     private _func;
@@ -12734,16 +15279,7 @@ export function delay(instance: any, ms: number, method: Function, data?: any[])
  * @param data Arguments to pass to the method
  * @return The delayed delegate function.
  */
-export function throttledDelegate(instance: any, ms: number, method: Function, data?: any[]): Function;
-/**
- * Executes the provided function after the specified amount of time
- *
- * @param callback Function to execute
- * @param delay Delay in milliseconds to wait before executing the Function
- * @param firstDelay Delay in milliseconds to wait before executing the Function for the first time (default 0)
- * @param method Method to execute
- */
-export function poll(callback: IFunctionPR<IArgsFunctionR<any>, void>, delay: number, firstDelay?: number): void;
+export function throttledDelegate(instance: any, ms: number, method: Function, data?: any[]): IArgsFunctionR<any>;
 /**
  * Splits a string that contains a list of comma-separated (signed) integer values into an array
  *
@@ -12786,670 +15322,6 @@ export class Cancelable {
      */
     register(callback: Function): void;
 }
-export class TypeFactory {
-    private _ctors;
-    /**
-     * An add-in object used to extend a constructor function's behavior to allow it to
-     * act as a factory for registered sub-classes. Instances can be created by passing the appropriate
-     * registration key and constructor arguments.
-     *
-     * Usage:
-     *     function Foo() {... }
-     *     Foo.extend(new TypeFactory());
-     *
-     *     function Bar(arg1, arg2) {...}
-     *     Bar.inherit(Foo, { });
-     *     Foo.registerConstructor("bar", Bar);
-     *
-     *     var bar = Foo.createInstance("bar", [arg1value, arg2value]);
-     */
-    constructor();
-    /**
-     * Register a constructor with the factory
-     *
-     * @param key The key for the constructor that is use later when creating instances.
-     * @param ctor The constructor being registered.
-     */
-    registerConstructor(key: string, ctor: Function): void;
-    /**
-     * Get the constructor registered with the specified key.
-     *
-     * @param key The key to use when looking up the registered constructor.
-     * @return Returns the constructor registered with the specified key, or undefined.
-     */
-    getConstructor(key: string): Function;
-    /**
-     * Create an instance of a registered type.
-     *
-     * @param key The key for the registered constructor function.
-     * @param args Arguments to pass to the constructor function.
-     * @return An instance of the type registered with the key.
-     */
-    createInstance(key: string, args?: any[]): any;
-}
-/**
- * Gets the anti-forgery token value.
- *
- * @return The INPUT element that holds the token value.
- */
-export function getAntiForgeryTokenValue(): string;
-/**
- * Get the anti-forgery token value (version 2).
- *
- * @return The INPUT element that holds the token value.
- */
-export function getAntiForgeryTokenValue2(): string;
-/**
- * Set a token on the specified to the current anti-forgery token. Expects an INPUT element with a specific name - __RequestVerificationToken
- *
- * @param form The form on which to look for the INPUT element.
- * @return The form value (if the token was set), otherwise undefined.
- */
-export function setAntiForgeryToken(form: JQuery): JQuery;
-export class StringBuilder {
-    private _textBuilder;
-    /**
-     * Utility class for building strings - similar to the System.Text.StringBuilder .NET class.
-     */
-    constructor();
-    /**
-     * Appends the specified text to the end of the string buffer.
-     *
-     * @param text The text to append.
-     */
-    append(text: string): void;
-    /**
-     * Appends a new-line to the current text buffer.
-     */
-    appendNewLine(): void;
-    /**
-     * Concatenates all text in the string buffer into a single string value.
-     *
-     * @return The string version of the accumulated text.
-     */
-    toString(): string;
-}
-export class OperationQueue {
-    private _operationQueue;
-    private _isProcessingOperation;
-    /**
-     * Allows for sequential processing of asyncronous operations.
-     */
-    constructor();
-    /**
-     * Queues the provided operation.  Operations are processed sequentially.
-     *
-     * @param operation
-     * Function for the operation to be performed.  The function should have the following signature:
-     *         function operation(completedCallback)
-     *
-     * The completed callback needs to be invoked when the operation is completed in order to allow subsequent
-     * operations to be performed.
-     *
-     */
-    queueOperation(operation: IFunctionPR<Function, void>): void;
-    /**
-     * Begins processing the next operation in the queue if there is not one already in progress.
-     */
-    private _processQueue();
-}
-export module DateUtils {
-    var MILLISECONDS_IN_MINUTE: number;
-    var MILLISECONDS_IN_HOUR: number;
-    var MILLISECONDS_IN_DAY: number;
-    var MILLISECONDS_IN_WEEK: number;
-    var DATETIME_MINDATE_UTC_MS: number;
-    /**
-     * Checks whether this date object corresponds to a min date or not
-     *
-     * @return
-     */
-    function isMinDate(date: Date): boolean;
-    /**
-     * Compares this date object with the given date object
-     *
-     * @param date1 Date object to compare
-     * @param date2 Date object to compare
-     * @return
-     */
-    function compare(date1: Date, date2: Date): number;
-    /**
-     * Compare two dates to see if they are equal - returning true if they are equal.
-     *
-     * @param date1 The first value to compare
-     * @param date2 The second value to compare
-     * @return
-     */
-    function equals(date1: Date, date2: Date): boolean;
-    /**
-     * Shifts the date to match the UTC date.  This is done by removing the timezone offset which is applied.
-     *
-     * @param date The date to be converted.
-     * @return
-     */
-    function shiftToUTC(date: Date): Date;
-    /**
-     * Shifts the date to match the local date.  This is done by adding the timezone offset to the date.
-     *
-     * @param date The date to be converted.
-     * @return
-     */
-    function shiftToLocal(date: Date): Date;
-    /**
-     * Parses the string into a date.
-     *
-     * @param dateString Date string to parse.
-     * @param parseFormat Optional format string to use in parsing the date. May be null or undefined
-     * @param ignoreTimeZone
-     *     Optional value indicating to ignore the time zone set set in user preferences?
-     *     Should be set to true when a Date string should be parsed irrespective of the user's time zone (e.g. calendar control).
-     *
-     * @return
-     */
-    function parseDateString(dateString: string, parseFormat?: string, ignoreTimeZone?: boolean): Date;
-    /**
-     * Returns the number of days between the two dates. Note that any time component is ignored and the dates
-     * can be supplied in any order
-     *
-     * @param startDate The first date
-     * @param endDate The second date
-     * @param exclusive If true then the result is exclusive of the second date (Mon->Fri==4).
-     * Otherwise the date includes the later date (Mon->Fri==5)
-     */
-    function daysBetweenDates(startDate: Date, endDate: Date, exclusive?: boolean): number;
-    /**
-     * @param value Date string
-     * @param formats Date string formats
-     * @param ignoreTimeZone
-     * @return
-     */
-    function parseLocale(value: string, formats?: string[] | string, ignoreTimeZone?: boolean): Date;
-    /**
-     * @param date The Date object to format
-     * @param format Date string format
-     * @param ignoreTimeZone
-     * @return
-     */
-    function localeFormat(date: Date, format?: string, ignoreTimeZone?: boolean): string;
-    /**
-     * Converts a time from the client (e.g. new Date()) to the user's preferred timezone
-     *
-     * @param date The Date object to convert
-     * @param adjustOffset
-     *     If true, consider the date portion when converting (get the timezone offset at that particular date).
-     *     False indicates to use the current (today's) timezone offset regardless of the date given.
-     *
-     */
-    function convertClientTimeToUserTimeZone(date: Date, adjustOffset?: boolean): Date;
-    /**
-     * Converts a time from the user's preferred timezone to the client (e.g. new Date()) timezone
-     *
-     * @param date The Date object to convert
-     * @param adjustOffset
-     *     If true, consider the date portion when converting (get the timezone offset at that particular date).
-     *     False indicates to use the current (today's) timezone offset regardless of the date given.
-     *
-     */
-    function convertUserTimeToClientTimeZone(date: Date, adjustOffset?: boolean): Date;
-    /**
-     * Strip the time from the given date (return a new date) such that the new date is of 12:00:00 AM
-     */
-    function stripTimeFromDate(date: Date): Date;
-    /**
-     * Get the equivalent of "Now" in the user's time zone.
-     */
-    function getNowInUserTimeZone(): Date;
-    /**
-     * Get the equivalent of "Today" (date as of midnight) in the user's time zone
-     */
-    function getTodayInUserTimeZone(): Date;
-    /**
-     * @param date The Date object to format
-     * @param format Date string format
-     * @return
-     */
-    function format(date: Date, format?: string): string;
-    /**
-     * Generate a string indicating how long ago the date is.
-     *
-     * @param date The Date object to format
-     * @param now
-     * @return A friendly string
-     */
-    function ago(date: Date, now?: Date): string;
-    /**
-     * Adds days to a given date
-     *
-     * @param date The Date object to add to
-     * @param days Number of days to add
-     * @param adjustOffset is true then the offset will be adjusted if the offset between the date passed
-     * and the date obtained after adding days is different.
-     *
-     */
-    function addDays(date: Date, days: number, adjustOffset?: boolean): Date;
-    /**
-     * Adds hours to a given date
-     *
-     * @param date The Date object to add to
-     * @param hours Number of hours to add
-     * @param adjustOffset is true then the offset will be adjusted if the offset between the date passed
-     * and the date obtained after adding hours is different.
-     *
-     */
-    function addHours(date: Date, hours: number, adjustOffset?: boolean): Date;
-    /**
-     * Adjusts the time zone offset by applying the time difference in the offsets.
-     *
-     * @param oldDate The Date object which was used before time zone changed.
-     * @param newDate The Date object which was used after time zone changed.
-     */
-    function adjustOffsetForTimes(oldDate: Date, newDate: Date, applicationDate?: Date): Date;
-    /**
-     * Gets the offset of the date passed in.
-     *
-     * @param date The Date object for which the offset is required.
-     * @param defaultToUtcOffset A value indicating whether the server side set utc offset should be returned if no offset for date is returned.
-     */
-    function getOffsetForDate(date: Date): number;
-    /**
-     * Checks whether given day is today in user timezone
-     *
-     * @param date The Date object to check
-     */
-    function isGivenDayToday(date: Date): boolean;
-    /**
-     * Checks whether given day is a day in past in user timezone
-     *
-     * @param date The Date object to check
-     */
-    function isGivenDayInPast(date: Date): boolean;
-    /**
-     * Checks whether given day is a day in future in user timezone
-     *
-     * @param date The Date object to check
-     */
-    function isGivenDayInFuture(date: Date): boolean;
-    /**
-     * Get a user friendly string for a date that indicates how long ago the date was. e.g. "4 hours ago", "Tuesday", "7/4/2012".
-     *
-     * @param date The Date object to format
-     * @param now
-     * @return A string version of the date.
-     */
-    function friendly(date: Date, now?: Date): string;
-}
-export module ArrayUtils {
-    /**
-     * Returns the first element of an array that matches the predicate.
-     *
-     * @param array Array used to perform predicate.
-     * @param predicate The Predicate function.
-     * @return The first element that matches the predicate.
-     */
-    function first<T>(array: T[], predicate?: (value: T) => boolean): T;
-    function arrayContains<S, T>(value: S, target: T[], comparer?: (s: S, t: T) => boolean): boolean;
-    function arrayEquals<S, T>(source: S[], target: T[], comparer?: (s: S, t: T) => boolean, nullResult?: boolean): boolean;
-    /**
-     * Take an array of values and convert it to a dictionary/lookup table.
-     * @param array Values to convert
-     * @param getKey Function to get the key for a given item
-     * @param getValue Optional function to get teh value for a given item (defaults to the item itself)
-     * @param throwOnDuplicateKeys Optional value indicating to throw an error when duplicate keys are present. Otherwise just overwrite any duplicates
-     * @return
-     */
-    function toDictionary<TArray, TValue>(array: TArray[], getKey: (item: TArray, index: number) => string, getValue?: (item: TArray, index: number) => TValue, throwOnDuplicateKeys?: boolean): IDictionaryStringTo<TValue>;
-    /**
-     * @param array
-     * @param value
-     * @param comparer
-     * @return
-     */
-    function contains<T>(array: T[], value: T, comparer?: IComparer<any>): boolean;
-    /**
-     * @param array
-     * @param predicate
-     * @return
-     */
-    function findIndex<T>(array: T[], predicate: IFunctionPR<T, boolean>): number;
-    /**
-     * @param arrayA
-     * @param arrayB
-     * @param comparer
-     * @return
-     */
-    function intersect<T>(arrayA: T[], arrayB: T[], comparer?: IComparer<T>): T[];
-    /**
-     * Helper method used to intersect arrays of strings or numbers
-     *
-     * @param arrayA
-     * @param arrayB
-     * @param caseInsensitive
-     * @return
-     */
-    function intersectPrimitives<T>(arrayA: T[], arrayB: T[], caseInsensitive?: boolean): T[];
-    /**
-     * @param arrayA
-     * @param arrayB
-     * @param comparer
-     * @return
-     */
-    function union<T>(arrayA: T[], arrayB: T[], comparer?: IComparer<T>): T[];
-    /**
-     * Sorts and removes duplicate elements
-     *
-     * @param array
-     * @param comparer
-     * @return
-     */
-    function uniqueSort<T>(array: T[], comparer?: IComparer<T>): T[];
-    /**
-     * @param array
-     * @param comparer
-     * @return
-     */
-    function unique<T>(array: T[], comparer?: IComparer<T>): T[];
-    /**
-     * @param arrayA
-     * @param arrayB
-     * @param comparer
-     * @return
-     */
-    function subtract<T>(arrayA: T[], arrayB: T[], comparer?: IComparer<T>): T[];
-    /**
-     * Reorders an array by moving oldIndex + the "count" next elements to the newIndex in the array
-     *
-     * @param array
-     * @param oldIndex The index of the array element to move
-     * @param newIndex The index of the array to insert the element at
-     * @param count The number of subsequent, contiguous elements to take with the oldIndex in the reorder
-     */
-    function reorder<T>(array: T[], oldIndex: number, newIndex: number, count: number): T[];
-    /**
-     * @param array
-     * @param comparer
-     * @return
-     */
-    function flagSorted<T>(array: T[], comparer: IComparer<T>): void;
-    /**
-     * @param toArray
-     * @param fromArray
-     * @return
-     */
-    function copySortFlag<T>(toArray: T[], fromArray: T[]): void;
-    /**
-     * @param array
-     * @param comparer
-     * @return
-     */
-    function isSorted<T>(array: T[], comparer: IComparer<T>): boolean;
-    /**
-     * @param array
-     * @param comparer
-     * @return
-     */
-    function sortIfNotSorted<T>(array: T[], comparer: IComparer<T>): boolean;
-    /**
-     * @param array
-     * @return
-     */
-    function clone<T>(array: T[]): T[];
-    /**
-     * @param array
-     * @param item
-     * @return
-     */
-    function indexOf<T>(array: T[], item: T): number;
-    /**
-     * @param array
-     * @param item
-     */
-    function add<T>(array: T[], item: T): void;
-    /**
-     * @param array
-     * @param items
-     */
-    function addRange<T>(array: T[], items: T[]): void;
-    /**
-     * @param array
-     * @param item
-     * @return
-     */
-    function remove<T>(array: T[], item: T): boolean;
-    /**
-     * @param array
-     */
-    function clear<T>(array: T[]): void;
-}
-export module StringUtils {
-    var EmptyGuidString: string;
-    var empty: string;
-    var newLine: string;
-    var tab: string;
-    var lineFeed: string;
-    /**
-     * 		HTML Encodes the string. Use this method to help prevent cross site scripting attacks
-     *     by cleaning text which may contain HTML elements before the string is display in a web page.
-     *
-     *
-     * @param str The string to be encoded
-     * @return A copy of the current string which has been HTML encoded
-     */
-    function htmlEncode(str: string): string;
-    /**
-     * 		HTML Encodes the string. Use this method to help prevent cross site scripting attacks
-     *     by cleaning text which may contain HTML elements before the string is display in a web page.
-     *     Does not encode single quotes.
-     *
-     *
-     * @param str The string to be encoded
-     * @return A copy of the current string which has been HTML encoded
-     */
-    function htmlEncodeJavascriptAttribute(str: string): string;
-    /**
-     * 		HTML Decodes the string.
-     *
-     *
-     * @param str The string to be decoded
-     * @return A copy of the current string which has been HTML decoded
-     */
-    function htmlDecode(str: string): string;
-    /**
-     * 		HTML Decodes the string.
-     *
-     *
-     * @param str The string to be decoded
-     * @return
-     *    A copy of the current string which has been HTML decoded.
-     *    > < etc are converted back to HTML form(<, > etc)
-     *
-     */
-    function decodeHtmlSpecialChars(str: string): string;
-    /**
-     * 		HTML encodes the string and replaces newlines with HTML break tags.
-     * 		Use this method to maintain line breaks when displaying strings.
-     *
-     *
-     * @param str The string to be encoded.
-     * @return A copy of the current string which has been HTML encoded
-     */
-    function nl2br(str: string): string;
-    /**
-    *	returns a string with the first letter as UpperCase and the rest lower case
-    *   Assumes the string is trimmed (no leading white-space) and starts with a valid character
-    *   if the first char is not an alphabet, no char will be made upper case
-    * @param str  The string to be converted.</param>
-    * @return A copy of the current string which has been sentence cased
-    */
-    function toSentenceCase(str: string): string;
-    /**
-     * @param a
-     * @param b
-     * @return
-     */
-    function defaultComparer(a: string, b: string): number;
-    /**
-     * @param a
-     * @param b
-     * @return
-     */
-    function ignoreCaseComparer(a: string, b: string): number;
-    /**
-     * @param a
-     * @param b
-     * @return
-     */
-    function localeComparer(a: string, b: string): number;
-    /**
-     * @param a
-     * @param b
-     * @return
-     */
-    function localeIgnoreCaseComparer(a: string, b: string): number;
-    /**
-    * Compares 2 strings for equality.
-    *
-    * @param a First string to compare
-    * @param b Second string to compare
-    * @param ignoreCase If true, do a case-insensitive comparison.
-    */
-    function equals(a: string, b: string, ignoreCase?: boolean): boolean;
-    /**
-     * @param str
-     * @param prefix
-     * @param comparer
-     * @return
-     */
-    function startsWith(str: string, prefix: string, comparer?: IComparer<string>): boolean;
-    /**
-     * @param str
-     * @param suffix
-     * @param comparer
-     * @return
-     */
-    function endsWith(str: string, suffix: string, comparer?: IComparer<string>): boolean;
-    /**
-     * @param str
-     * @param subStr
-     * @return
-     */
-    function caseInsensitiveContains(str: string, subStr: string): boolean;
-    /**
-     * @param format
-     * @param args
-     * @return
-     */
-    function format(format: string, ...args: any[]): string;
-    /**
-     * @param format
-     * @param args
-     * @return
-     */
-    function localeFormat(format: string, ...args: any[]): string;
-    function containsControlChars(str: string): boolean;
-    function containsMismatchedSurrogateChars(str: string): boolean;
-    /**
-     *  Base64 encodes the string. Uses the native version if available.
-     *  @param s The string that should be encoded.
-     *  @return The string in base64 encoding.
-     */
-    function base64Encode(s: string): string;
-    function isGuid(str: string): boolean;
-}
-export module NumberUtils {
-    /**
-     * @param a
-     * @param b
-     * @return
-     */
-    function defaultComparer(a: any, b: any): number;
-    /**
-     * Converts this number to a string in the current culture's locale
-     * without specifying a precision. So, for example, with Spanish culture,
-     * (3) gets translated to "3", and (3.1416) becomes "3,1416". The jQuery's
-     * localeFormat requires a precision (the default is "2" if not specified).
-     * So 3.localeFormat("N") become "3,00".
-     *
-     * @param num  The Number to format
-     * @param includeGroupSeparators If true, use locale-specific
-     * group separators (i.e. 3,000) in the output
-     * @param cultureInfo Culture info (CurrentCulture if not specified)
-     * @return
-     */
-    function toDecimalLocaleString(num: number, includeGroupSeparators?: boolean, cultureInfo?: any): string;
-    /**
-     * @param value
-     * @return
-     */
-    function parseLocale(value: string): number;
-    /**
-     * @param value
-     * @return
-     */
-    function isPositiveNumber(value: any): boolean;
-    /**
-     * @param value
-     * @return
-     */
-    function parseInvariant(value: string): number;
-    /**
-     * @param value
-     * @param format
-     * @return
-     */
-    function localeFormat(value: number, format: string): string;
-}
-/**
-* Utility class for file-related operations.
-*/
-export module FileUtils {
-    /**
-    * File encoding values.
-    */
-    enum FileEncoding {
-        Unknown = 0,
-        Binary = 1,
-        ASCII = 2,
-        UTF8 = 3,
-        UTF32_BE = 4,
-        UTF32_LE = 5,
-        UTF16_BE = 6,
-        UTF16_LE = 7,
-    }
-    function tryDetectFileEncoding(base64Content: string): FileEncoding;
-}
-/**
-* Path-related Utility methods
-*/
-export module PathUtils {
-    /**
-    * Combine 2 path segments using the given separator ("/" is the default)
-    *
-    * @param path1 First path segment
-    * @param path2 Second path segment
-    * @param pathSeparator Optional path separator ("/" is the default)
-    * @return combined string
-    */
-    function combinePaths(path1: string, path2: string, pathSeparator?: string): string;
-    /**
-    * Ensure that the given path ends with a separator. If not, add the separator to the end.
-    *
-    * @param path Path to verify
-    * @param pathSeparator Optional path separator ("/" is the default)
-    * @return resulting string that ends with the separator
-    */
-    function ensureTrailingSeparator(path: string, pathSeparator?: string): string;
-}
-export module BoolUtils {
-    /**
-     * @param value
-     * @return
-     */
-    function parse(value: string): boolean;
-}
-export module UserAgentUtils {
-    function isWindowsClient(): boolean;
-    function getUserAgent(): string;
-}
 export class DisposalManager implements IDisposable {
     /**
      * List of disposables.
@@ -13467,38 +15339,7 @@ export class DisposalManager implements IDisposable {
      */
     dispose(): void;
 }
-export module AnchorLinkUtils {
-    /**
-    * Finds an anchor according to HTML 5 Specifications - Navigating to a fragment identifier
-    * Relevant parts:
-    *  If there is an element in the DOM that has an ID exactly equal to decoded fragid, then the
-    *    first such element in tree order is the indicated part of the document; stop the
-    *    algorithm here.
-    *  No decoded fragid: If there is an a element in the DOM that has a name attribute whose
-    *    value is exactly equal to fragid (not decoded fragid), then the first such element in
-    *    tree order is the indicated part of the document; stop the algorithm here.
-    *  If fragid is an ASCII case-insensitive match for the string top, then the indicated part of
-    *    the document is the top of the document; stop the algorithm here.
-    *  Otherwise, there is no indicated part of the document.
-    *
-    * @param name The name of the anchor.
-    * @param container The container in which to search for the anchor.
-    * @return The element corresponding to the anchor or the container itself if the anchor refers
-    *         to the top.
-    */
-    function findAnchorInContainer(name: string, container: JQuery): JQuery;
-}
-export module GUIDUtils {
-    /**
-     * Returns a GUID such as xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx.
-     * @return New GUID.(UUID version 4 = xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)
-     * @notes This code is taken from \WebAccess\Search\Scripts\TFS.Search.Helpers.ts and \WebAccess\Build\Scripts\TFS.BuildvNext.WebApi.ts
-     * @notes Disclaimer: This implementation uses non-cryptographic random number generator so absolute uniqueness is not guarantee.
-     */
-    function newGuid(): string;
-}
-export function unpackIntegerArray(array: number[]): number[];
-export function getCookie(cookieName: string): string;
+export function tryParseMSJSON(data: any, secure: boolean): any;
 export function parseMSJSON(data: any, secure: boolean): any;
 export function stringifyMSJSON(object: any): string;
 /**
@@ -13510,16 +15351,6 @@ export function stringifyMSJSON(object: any): string;
  * @return
  */
 export function parseJsonIsland($context: JQuery, selectionFilter?: string, remove?: boolean): any;
-export function findTreeNode(path: string, separator: string, comparer: IComparer<string>, textField: string): any;
-export function calculateTreePath(includeRoot: boolean, separator: string, textField: string, rootField: string): string;
-export function walkTree(f: IFunctionPPR<any, any, void>): void;
-export interface IFilterGroup {
-    start: number;
-    end: number;
-    level: number;
-}
-export function updateFilterGroups(groups: IFilterGroup[], clauseNumber: number, insert: boolean): IFilterGroup[];
-export function updateFilterGroupLevels(groups: IFilterGroup[]): number;
 /**
  * Converts the specified value to a display string.
  *
@@ -13527,49 +15358,230 @@ export function updateFilterGroupLevels(groups: IFilterGroup[]): number;
  * @param format The value to convert.
  */
 export function convertValueToDisplayString(value: any, format?: string): string;
-/**
- * Parses a comma and/or semicolumn delimited string of email addresses into an array of the addresses.
- *
- * @param emailAddressesString A comma and/or semicolumn delimited string of email addresses
- * @return The parsed array of email addresses.
- */
-export function parseEmailAddressesStringToArray(emailAddressesString: string): string[];
 export function domToXml(xmlNode: any): string;
 export function parseXml(xml: string): any;
-export class Dictionary {
-    private _TKey;
-    private _TValue;
-    private _items;
-    private _allowNullKey;
-    private _throwOnKeyMissing;
-    private _count;
-    /**
-     * A 'typed' dictionary that mirrors the .NET IDictionary interface.
-     *
-     * @param TKey The type for the dictionary keys.
-     * @param TValue The type for the dictionary values.
-     * @param options Options for controlling the dictionary:
-     *    allowNullKey: if true, allows null values for the key. Default: false
-     *    throwOnKeyMissing: if true, will throw when retrieving a value who's key does not exist in the dictionary. Default false.
-     */
-    constructor(TKey: any, TValue: any, options?: any);
-    count(): number;
-    /**
-     * @param value
-     */
-    item(key: any, value?: any): any;
-    keys(): any;
-    values(): any;
-    add(key: any, value: any): void;
-    clear(): void;
-    containsKey(key: any): any;
-    get(key: any): any;
-    remove(key: any): void;
-    set(key: any, value: any): void;
-    tryGetValue(key: any, out: any): boolean;
-    private _checkKey(key);
-    private _set(key, value);
+export var documentSelection: any;
 }
+declare module "VSS/Utils/Date" {
+import Contracts_Platform = require("VSS/Common/Contracts/Platform");
+export var utcOffset: number;
+export var timeZoneMap: Contracts_Platform.DaylightSavingsAdjustmentEntry[];
+export var MILLISECONDS_IN_MINUTE: number;
+export var MILLISECONDS_IN_HOUR: number;
+export var MILLISECONDS_IN_DAY: number;
+export var MILLISECONDS_IN_WEEK: number;
+export var DATETIME_MINDATE_UTC_MS: number;
+/**
+    * Checks whether this date object corresponds to a min date or not
+    *
+    * @return
+    */
+export function isMinDate(date: Date): boolean;
+/**
+    * Compares this date object with the given date object
+    *
+    * @param date1 Date object to compare
+    * @param date2 Date object to compare
+    * @return
+    */
+export function compare(date1: Date, date2: Date): number;
+/**
+    * Compare two dates to see if they are equal - returning true if they are equal.
+    *
+    * @param date1 The first value to compare
+    * @param date2 The second value to compare
+    * @return
+    */
+export function equals(date1: Date, date2: Date): boolean;
+/**
+    * Shifts the date to match the UTC date.  This is done by removing the timezone offset which is applied.
+    *
+    * @param date The date to be converted.
+    * @return
+    */
+export function shiftToUTC(date: Date): Date;
+/**
+    * Shifts the date to match the local date.  This is done by adding the timezone offset to the date.
+    *
+    * @param date The date to be converted.
+    * @return
+    */
+export function shiftToLocal(date: Date): Date;
+/**
+    * Parses the string into a date.
+    *
+    * @param dateString Date string to parse.
+    * @param parseFormat Optional format string to use in parsing the date. May be null or undefined
+    * @param ignoreTimeZone
+    *     Optional value indicating to ignore the time zone set set in user preferences?
+    *     Should be set to true when a Date string should be parsed irrespective of the user's time zone (e.g. calendar control).
+    *
+    * @return
+    */
+export function parseDateString(dateString: string, parseFormat?: string, ignoreTimeZone?: boolean): Date;
+/**
+    * Returns the number of days between the two dates. Note that any time component is ignored and the dates
+    * can be supplied in any order
+    *
+    * @param startDate The first date
+    * @param endDate The second date
+    * @param exclusive If true then the result is exclusive of the second date (Mon->Fri==4).
+    * Otherwise the date includes the later date (Mon->Fri==5)
+    */
+export function daysBetweenDates(startDate: Date, endDate: Date, exclusive?: boolean): number;
+/**
+    * @param value Date string
+    * @param formats Date string formats
+    * @param ignoreTimeZone
+    * @return
+    */
+export function parseLocale(value: string, formats?: string[] | string, ignoreTimeZone?: boolean): Date;
+/**
+    * @param date The Date object to format
+    * @param format Date string format
+    * @param ignoreTimeZone
+    * @return
+    */
+export function localeFormat(date: Date, format?: string, ignoreTimeZone?: boolean): string;
+/**
+    * Converts a time from the client (e.g. new Date()) to the user's preferred timezone
+    *
+    * @param date The Date object to convert
+    * @param adjustOffset
+    *     If true, consider the date portion when converting (get the timezone offset at that particular date).
+    *     False indicates to use the current (today's) timezone offset regardless of the date given.
+    *
+    */
+export function convertClientTimeToUserTimeZone(date: Date, adjustOffset?: boolean): Date;
+/**
+    * Converts a time from the user's preferred timezone to the client (e.g. new Date()) timezone
+    *
+    * @param date The Date object to convert
+    * @param adjustOffset
+    *     If true, consider the date portion when converting (get the timezone offset at that particular date).
+    *     False indicates to use the current (today's) timezone offset regardless of the date given.
+    *
+    */
+export function convertUserTimeToClientTimeZone(date: Date, adjustOffset?: boolean): Date;
+/**
+    * Strip the time from the given date (return a new date) such that the new date is of 12:00:00 AM
+    */
+export function stripTimeFromDate(date: Date): Date;
+/**
+    * Get the equivalent of "Now" in the user's time zone.
+    */
+export function getNowInUserTimeZone(): Date;
+/**
+    * Get the equivalent of "Today" (date as of midnight) in the user's time zone
+    */
+export function getTodayInUserTimeZone(): Date;
+/**
+    * @param date The Date object to format
+    * @param format Date string format
+    * @return
+    */
+export function format(date: Date, format?: string): string;
+/**
+    * Generate a string indicating how long ago the date is.
+    *
+    * @param date The Date object to format
+    * @param now
+    * @return A friendly string
+    */
+export function ago(date: Date, now?: Date): string;
+/**
+    * Adds days to a given date
+    *
+    * @param date The Date object to add to
+    * @param days Number of days to add
+    * @param adjustOffset is true then the offset will be adjusted if the offset between the date passed
+    * and the date obtained after adding days is different.
+    *
+    */
+export function addDays(date: Date, days: number, adjustOffset?: boolean): Date;
+/**
+    * Adds hours to a given date
+    *
+    * @param date The Date object to add to
+    * @param hours Number of hours to add
+    * @param adjustOffset is true then the offset will be adjusted if the offset between the date passed
+    * and the date obtained after adding hours is different.
+    *
+    */
+export function addHours(date: Date, hours: number, adjustOffset?: boolean): Date;
+/**
+    * Adjusts the time zone offset by applying the time difference in the offsets.
+    *
+    * @param oldDate The Date object which was used before time zone changed.
+    * @param newDate The Date object which was used after time zone changed.
+    */
+export function adjustOffsetForTimes(oldDate: Date, newDate: Date, applicationDate?: Date): Date;
+/**
+    * Gets the offset of the date passed in.
+    *
+    * @param date The Date object for which the offset is required.
+    * @param defaultToUtcOffset A value indicating whether the server side set utc offset should be returned if no offset for date is returned.
+    */
+export function getOffsetForDate(date: Date): number;
+/**
+    * Checks whether given day is today in user timezone
+    *
+    * @param date The Date object to check
+    */
+export function isGivenDayToday(date: Date): boolean;
+/**
+    * Checks whether given day is a day in past in user timezone
+    *
+    * @param date The Date object to check
+    */
+export function isGivenDayInPast(date: Date): boolean;
+/**
+    * Checks whether given day is a day in future in user timezone
+    *
+    * @param date The Date object to check
+    */
+export function isGivenDayInFuture(date: Date): boolean;
+/**
+    * Get a user friendly string for a date that indicates how long ago the date was. e.g. "4 hours ago", "Tuesday", "7/4/2012".
+    *
+    * @param date The Date object to format
+    * @param now
+    * @return A string version of the date.
+    */
+export function friendly(date: Date, now?: Date): string;
+}
+declare module "VSS/Utils/File" {
+/**
+* File encoding values.
+*/
+export enum FileEncoding {
+    Unknown = 0,
+    Binary = 1,
+    ASCII = 2,
+    UTF8 = 3,
+    UTF32_BE = 4,
+    UTF32_LE = 5,
+    UTF16_BE = 6,
+    UTF16_LE = 7,
+}
+export function tryDetectFileEncoding(base64Content: string): FileEncoding;
+/**
+* Combine 2 path segments using the given separator ("/" is the default)
+*
+* @param path1 First path segment
+* @param path2 Second path segment
+* @param pathSeparator Optional path separator ("/" is the default)
+* @return combined string
+*/
+export function combinePaths(path1: string, path2: string, pathSeparator?: string): string;
+/**
+* Ensure that the given path ends with a separator. If not, add the separator to the end.
+*
+* @param path Path to verify
+* @param pathSeparator Optional path separator ("/" is the default)
+* @return resulting string that ends with the separator
+*/
+export function ensureTrailingSeparator(path: string, pathSeparator?: string): string;
 }
 declare module "VSS/Utils/Html" {
 export module HtmlNormalizer {
@@ -13645,6 +15657,208 @@ export class TemplateEngine {
      * A static template engine for applying JS objects to a "jquery-tmpl" like template.
      */
     constructor();
+}
+}
+declare module "VSS/Utils/Number" {
+/**
+    * @param a
+    * @param b
+    * @return
+    */
+export function defaultComparer(a: any, b: any): number;
+/**
+    * Converts this number to a string in the current culture's locale
+    * without specifying a precision. So, for example, with Spanish culture,
+    * (3) gets translated to "3", and (3.1416) becomes "3,1416". The jQuery's
+    * localeFormat requires a precision (the default is "2" if not specified).
+    * So 3.localeFormat("N") become "3,00".
+    *
+    * @param num  The Number to format
+    * @param includeGroupSeparators If true, use locale-specific
+    * group separators (i.e. 3,000) in the output
+    * @param cultureInfo Culture info (CurrentCulture if not specified)
+    * @return
+    */
+export function toDecimalLocaleString(num: number, includeGroupSeparators?: boolean, cultureInfo?: any): string;
+/**
+    * @param value
+    * @return
+    */
+export function parseLocale(value: string): number;
+/**
+    * @param value
+    * @return
+    */
+export function isPositiveNumber(value: any): boolean;
+/**
+    * @param value
+    * @return
+    */
+export function parseInvariant(value: string): number;
+/**
+    * @param value
+    * @param format
+    * @return
+    */
+export function localeFormat(value: number, format: string): string;
+}
+declare module "VSS/Utils/String" {
+export var EmptyGuidString: string;
+export var empty: string;
+export var newLine: string;
+export var tab: string;
+export var lineFeed: string;
+/**
+    * 		HTML Encodes the string. Use this method to help prevent cross site scripting attacks
+    *     by cleaning text which may contain HTML elements before the string is display in a web page.
+    *
+    *
+    * @param str The string to be encoded
+    * @return A copy of the current string which has been HTML encoded
+    */
+export function htmlEncode(str: string): string;
+/**
+    * 		HTML Encodes the string. Use this method to help prevent cross site scripting attacks
+    *     by cleaning text which may contain HTML elements before the string is display in a web page.
+    *     Does not encode single quotes.
+    *
+    *
+    * @param str The string to be encoded
+    * @return A copy of the current string which has been HTML encoded
+    */
+export function htmlEncodeJavascriptAttribute(str: string): string;
+/**
+    * 		HTML Decodes the string.
+    *
+    *
+    * @param str The string to be decoded
+    * @return A copy of the current string which has been HTML decoded
+    */
+export function htmlDecode(str: string): string;
+/**
+    * 		HTML Decodes the string.
+    *
+    *
+    * @param str The string to be decoded
+    * @return
+    *    A copy of the current string which has been HTML decoded.
+    *    > < etc are converted back to HTML form(<, > etc)
+    *
+    */
+export function decodeHtmlSpecialChars(str: string): string;
+/**
+    * 		HTML encodes the string and replaces newlines with HTML break tags.
+    * 		Use this method to maintain line breaks when displaying strings.
+    *
+    *
+    * @param str The string to be encoded.
+    * @return A copy of the current string which has been HTML encoded
+    */
+export function nl2br(str: string): string;
+/**
+*	returns a string with the first letter as UpperCase and the rest lower case
+*   Assumes the string is trimmed (no leading white-space) and starts with a valid character
+*   if the first char is not an alphabet, no char will be made upper case
+* @param str  The string to be converted.</param>
+* @return A copy of the current string which has been sentence cased
+*/
+export function toSentenceCase(str: string): string;
+/**
+    * @param a
+    * @param b
+    * @return
+    */
+export function defaultComparer(a: string, b: string): number;
+/**
+    * @param a
+    * @param b
+    * @return
+    */
+export function ignoreCaseComparer(a: string, b: string): number;
+/**
+    * @param a
+    * @param b
+    * @return
+    */
+export function localeComparer(a: string, b: string): number;
+/**
+    * @param a
+    * @param b
+    * @return
+    */
+export function localeIgnoreCaseComparer(a: string, b: string): number;
+/**
+* Compares 2 strings for equality.
+*
+* @param a First string to compare
+* @param b Second string to compare
+* @param ignoreCase If true, do a case-insensitive comparison.
+*/
+export function equals(a: string, b: string, ignoreCase?: boolean): boolean;
+/**
+    * @param str
+    * @param prefix
+    * @param comparer
+    * @return
+    */
+export function startsWith(str: string, prefix: string, comparer?: IComparer<string>): boolean;
+/**
+    * @param str
+    * @param suffix
+    * @param comparer
+    * @return
+    */
+export function endsWith(str: string, suffix: string, comparer?: IComparer<string>): boolean;
+/**
+    * @param str
+    * @param subStr
+    * @return
+    */
+export function caseInsensitiveContains(str: string, subStr: string): boolean;
+/**
+    * @param format
+    * @param args
+    * @return
+    */
+export function format(format: string, ...args: any[]): string;
+/**
+    * @param format
+    * @param args
+    * @return
+    */
+export function localeFormat(format: string, ...args: any[]): string;
+export function containsControlChars(str: string): boolean;
+export function containsMismatchedSurrogateChars(str: string): boolean;
+/**
+    *  Base64 encodes the string. Uses the native version if available.
+    *  @param s The string that should be encoded.
+    *  @return The string in base64 encoding.
+    */
+export function base64Encode(s: string): string;
+export function isGuid(str: string): boolean;
+export function isEmptyGuid(str: string): boolean;
+export class StringBuilder {
+    private _textBuilder;
+    /**
+     * Utility class for building strings - similar to the System.Text.StringBuilder .NET class.
+     */
+    constructor();
+    /**
+     * Appends the specified text to the end of the string buffer.
+     *
+     * @param text The text to append.
+     */
+    append(text: string): void;
+    /**
+     * Appends a new-line to the current text buffer.
+     */
+    appendNewLine(): void;
+    /**
+     * Concatenates all text in the string buffer into a single string value.
+     *
+     * @return The string version of the accumulated text.
+     */
+    toString(): string;
 }
 }
 declare module "VSS/Utils/UI" {
@@ -13903,6 +16117,17 @@ export interface ISectionManager {
     previousSection: () => boolean;
 }
 export var sectionManager: ISectionManager;
+export interface IFilterGroup {
+    start: number;
+    end: number;
+    level: number;
+}
+export function updateFilterGroups(groups: IFilterGroup[], clauseNumber: number, insert: boolean): IFilterGroup[];
+export function updateFilterGroupLevels(groups: IFilterGroup[]): number;
+export function findTreeNode(path: string, separator: string, comparer: IComparer<string>, textField: string): any;
+export function calculateTreePath(includeRoot: boolean, separator: string, textField: string, rootField: string): string;
+export function walkTree(f: IFunctionPPR<any, any, void>): void;
+export function injectStylesheets(cssReferenceUrls: string[], baseUrl?: string): void;
 }
 declare module "VSS/VSS" {
 export var uiCulture: string;
@@ -13972,9 +16197,13 @@ export function queuedRequestHasResult(cachedResult: any): boolean;
 export function getErrorMessage(errorString: string): string;
 export function getErrorMessage(errorFunction: Function): string;
 export function getErrorMessage(error: Error): string;
+export interface errorPublisher {
+    publishError(error: TfsError): void;
+}
 export class ErrorHandler {
     $error: JQuery;
     visible: boolean;
+    private _errorPublishers;
     /**
      * Global error handler class which is attached to TFS
      */
@@ -13983,6 +16212,9 @@ export class ErrorHandler {
      * (Internal function) Initializes error handler
      */
     initialize(): void;
+    private attachWindowErrorHandler();
+    private attachQPromiseErrorHandler();
+    private publishError(error);
     /**
      * (Internal function) Checks whether error container exists or not
      */
@@ -14000,6 +16232,14 @@ export class ErrorHandler {
      * message is displayed in an alert dialog
      */
     show(error: TfsError): void;
+    /**
+     * Add error publisher to ErrorHander class
+     */
+    attachErrorPublisher(errorPublisher: errorPublisher): void;
+    /**
+     * Remove error publisher to ErrorHander class
+     */
+    detachErrorPublisher(errorPublisher: errorPublisher): void;
 }
 /**
  * @param callback
@@ -14073,25 +16313,34 @@ export function using(moduleNames: string[], moduleLoaded: any): void;
 export function tfsModuleLoaded(moduleName: string, moduleExports: any): void;
 }
 declare module "VSS/WebApi/Constants" {
-export module AppStoreNames {
-    var BuiltIn: string;
-    var Me: string;
-}
 export module AuthenticationResourceIds {
     var AuthenticationLocationId: string;
     var AreaId: string;
     var AuthenticationAreaName: string;
     var SessionTokenResource: string;
 }
+export module BlobCopyLocationIds {
+    var ResourceId: string;
+    var ResourceString: string;
+    var ResouceName: string;
+    var AreaName: string;
+}
+export module BuiltInExtensionResourceIds {
+    var BuiltInExtensionsId: string;
+    var ExtensionsAreaName: string;
+}
 export module CommonIdentityPickerResourceIds {
     var IdentitiesLocationId: string;
     var IdentityAvatarLocationId: string;
+    var IdentityFeatureMruLocationId: string;
+    var IdentityConnectionsLocationId: string;
     var ServiceArea: string;
     var IdentitiesResource: string;
 }
 export module ContributionsResourceIds {
     var AppsLocationId: string;
     var InstalledAppsLocationId: string;
+    var InstalledAppsDataLocationId: string;
     var AreaId: string;
     var ContributionsAreaName: string;
 }
@@ -14100,10 +16349,26 @@ export module CustomerIntelligenceResourceIds {
     var AreaId: string;
     var CustomerIntelligenceAreaName: string;
 }
+export module DatabaseMigrationLocationIds {
+    var ResourceId: string;
+    var ResourceString: string;
+    var ResouceName: string;
+    var AreaName: string;
+}
+export module ExtensionStoreNames {
+    var BuiltIn: string;
+    var Me: string;
+}
 export module FeatureAvailabilityResourceIds {
     var FeatureFlagsLocationId: string;
     var AreaId: string;
     var FeatureAvailabilityAreaName: string;
+}
+export module IdentityMruResourceIds {
+    var MruIdentitiesLocationId: string;
+    var AreaId: string;
+    var AreaName: string;
+    var MruIdentitiesResource: string;
 }
 export module LocationResourceIds {
     var ConnectionData: string;
@@ -14127,11 +16392,6 @@ export module ServiceInstanceTypes {
     var TFSOnPremises: string;
     var SpsExtension: string;
     var SDKSample: string;
-    var ServiceHooks: string;
-    var ServiceHooks: string;
-    var Search: string;
-    var CodeAnalysis: string;
-    var DevTestLabs: string;
     var SPSString: string;
     var TFSString: string;
     var TFSOnPremisesString: string;
@@ -14141,67 +16401,67 @@ export module ServiceInstanceTypes {
 }
 declare module "VSS/WebApi/Contracts" {
 /**
-* Information about the location of a REST API resource
-*/
+ * Information about the location of a REST API resource
+ */
 export interface ApiResourceLocation {
     /**
-    * Area name for this resource
-    */
+     * Area name for this resource
+     */
     area: string;
     /**
-    * Unique Identifier for this location
-    */
+     * Unique Identifier for this location
+     */
     id: string;
     /**
-    * Maximum api version that this resource supports (current server version for this resource)
-    */
+     * Maximum api version that this resource supports (current server version for this resource)
+     */
     maxVersion: string;
     /**
-    * Minimum api version that this resource supports
-    */
+     * Minimum api version that this resource supports
+     */
     minVersion: string;
     /**
-    * The latest version of this resource location that is in &quot;Release&quot; (non-preview) mode
-    */
+     * The latest version of this resource location that is in "Release" (non-preview) mode
+     */
     releasedVersion: string;
     /**
-    * Resource name
-    */
+     * Resource name
+     */
     resourceName: string;
     /**
-    * The current resource version supported by this resource location
-    */
+     * The current resource version supported by this resource location
+     */
     resourceVersion: number;
     /**
-    * This location's route template (templated relative path)
-    */
+     * This location's route template (templated relative path)
+     */
     routeTemplate: string;
 }
 /**
-* Represents version information for a REST Api resource
-*/
+ * Represents version information for a REST Api resource
+ */
 export interface ApiResourceVersion {
     /**
-    * String representation of the Public API version. This is the version that the public sees and is used for a large group of services (e.g. the TFS 1.0 API)
-    */
+     * String representation of the Public API version. This is the version that the public sees and is used for a large group of services (e.g. the TFS 1.0 API)
+     */
     apiVersion: string;
     /**
-    * Is the public API version in preview
-    */
+     * Is the public API version in preview
+     */
     isPreview: boolean;
     /**
-    * Internal resource version. This is defined per-resource and is used to support build-to-build compatibility of API changes within a given (in-preview) public api version. For example, within the TFS 1.0 API release cycle, while it is still in preview, a resource's data structure may be changed. This resource can be versioned such that older clients will still work (requests will be sent to the older version) and new/upgraded clients will talk to the new version of the resource.
-    */
+     * Internal resource version. This is defined per-resource and is used to support build-to-build compatibility of API changes within a given (in-preview) public api version. For example, within the TFS 1.0 API release cycle, while it is still in preview, a resource's data structure may be changed. This resource can be versioned such that older clients will still work (requests will be sent to the older version) and new/upgraded clients will talk to the new version of the resource.
+     */
     resourceVersion: number;
 }
 export enum ConnectOptions {
     /**
-    * Retrieve no optional data.
-    */
+     * Retrieve no optional data.
+     */
     None = 0,
     /**
-    * Includes information about AccessMappings and ServiceDefinitions.
-    */
+     * Includes information about AccessMappings and ServiceDefinitions.
+     */
     IncludeServices = 1,
 }
 export interface IdentityRef {
@@ -14215,29 +16475,29 @@ export interface IdentityRef {
     url: string;
 }
 /**
-* The JSON model for JSON Patch Operations
-*/
+ * The JSON model for JSON Patch Operations
+ */
 export interface JsonPatchDocument {
 }
 /**
-* The JSON model for a JSON Patch operation
-*/
+ * The JSON model for a JSON Patch operation
+ */
 export interface JsonPatchOperation {
     /**
-    * The path to copy from for the Move/Copy operation.
-    */
+     * The path to copy from for the Move/Copy operation.
+     */
     from: string;
     /**
-    * The patch operation
-    */
+     * The patch operation
+     */
     op: Operation;
     /**
-    * The path for the operation
-    */
+     * The path for the operation
+     */
     path: string;
     /**
-    * The value for the operation. This is either a primitive or a JToken.
-    */
+     * The value for the operation. This is either a primitive or a JToken.
+     */
     value: any;
 }
 export interface JsonWebToken {
@@ -14257,17 +16517,17 @@ export enum Operation {
 }
 export interface Publisher {
     /**
-    * Name of the publishing service.
-    */
+     * Name of the publishing service.
+     */
     name: string;
     /**
-    * Service Owner Guid Eg. Tfs : 00025394-6065-48CA-87D9-7F5672854EF7
-    */
+     * Service Owner Guid Eg. Tfs : 00025394-6065-48CA-87D9-7F5672854EF7
+     */
     serviceOwnerId: string;
 }
 /**
-* The class to represent a REST reference link.  Example: { self: { href: &quot;http://localhost:8080/tfs/DefaultCollection/_apis/wit/workItems/1&quot; } }  RFC: http://tools.ietf.org/html/draft-kelly-json-hal-06  The RFC is not fully implemented, additional properties are allowed on the reference link but as of yet we don't have a need for them.
-*/
+ * The class to represent a REST reference link.  Example: { self: { href: "http://localhost:8080/tfs/DefaultCollection/_apis/wit/workItems/1" } }  RFC: http://tools.ietf.org/html/draft-kelly-json-hal-06  The RFC is not fully implemented, additional properties are allowed on the reference link but as of yet we don't have a need for them.
+ */
 export interface ReferenceLink {
     href: string;
 }
@@ -14277,34 +16537,34 @@ export interface ResourceRef {
 }
 export interface ServiceEvent {
     /**
-    * This is the id of the type. Constants that will be used by subscribers to identify/filter events being published on a topic.
-    */
+     * This is the id of the type. Constants that will be used by subscribers to identify/filter events being published on a topic.
+     */
     eventType: string;
     /**
-    * This is the service that published this event.
-    */
+     * This is the service that published this event.
+     */
     publisher: Publisher;
     /**
-    * The resource object that carries specific information about the event. The object must have the ServiceEventObject applied for serialization/deserialization to work.
-    */
+     * The resource object that carries specific information about the event. The object must have the ServiceEventObject applied for serialization/deserialization to work.
+     */
     resource: any;
     /**
-    * This dictionary carries the context descriptors along with their ids.
-    */
+     * This dictionary carries the context descriptors along with their ids.
+     */
     resourceContainers: {
         [key: string]: any;
     };
     /**
-    * This is the version of the resource.
-    */
+     * This is the version of the resource.
+     */
     resourceVersion: string;
 }
 export interface VssJsonCollectionWrapper extends VssJsonCollectionWrapperBase {
     value: any[];
 }
 /**
-* This class is used to serialized collections as a single JSON object on the wire, to avoid serializing JSON arrays directly to the client, which can be a security hole
-*/
+ * This class is used to serialized collections as a single JSON object on the wire, to avoid serializing JSON arrays directly to the client, which can be a security hole
+ */
 export interface VssJsonCollectionWrapperV<T> extends VssJsonCollectionWrapperBase {
     value: T;
 }
@@ -14312,6 +16572,9 @@ export interface VssJsonCollectionWrapperBase {
     count: number;
 }
 export interface WrappedException {
+    customProperties: {
+        [key: string]: any;
+    };
     errorCode: number;
     eventId: number;
     helpLink: string;
@@ -14402,9 +16665,20 @@ export interface VssApiResourceRequestParams {
     */
     area: string;
     /**
-    * Unique identifier for the resource's route to issue a request to
+    * Unique identifier for the resource's route to issue a request to. Used to lookup the route template
+    * for this request if the routeTemplate parameter is not supplied.
     */
-    locationId: string;
+    locationId?: string;
+    /**
+    * Route template that is used to form the request path. This can be used in place of locationId. If
+    * routeTemplate is NOT specified, then locationId is used to lookup the template via an OPTIONS request.
+    */
+    routeTemplate?: string;
+    /**
+    * Name of the resource to use in route template replacements. Only used if routeTemplate is provided instead of
+    * locationId.
+    */
+    resource?: string;
     /**
     * Dictionary of route template replacement values
     */
@@ -14430,7 +16704,8 @@ export interface VssApiResourceRequestParams {
     httpMethod?: string;
     /**
     * The http response (Accept) type. This is "json" (corresponds to application/json Accept header)
-    * unless otherwise specified. Other possible values are "html" or "text".
+    * unless otherwise specified. Other possible values are "html", "text", "zip", or "binary" or their accept
+    * header equivalents (e.g. application/zip).
     */
     httpResponseType?: string;
     /**
@@ -14494,6 +16769,7 @@ export class VssHttpClient {
     * @returns Q Promise for the response
     */
     _beginRequest<T>(requestParams: VssApiResourceRequestParams, useAjaxResult?: boolean): IPromise<T>;
+    private _beginRequestToResolvedUrl<T>(requestUrl, apiVersion, requestParams, deferred, useAjaxResult);
     /**
     * Issue a request to a VSS REST endpoint and makes sure the result contains jqXHR. Use spread to access jqXHR.
     *
@@ -14518,23 +16794,12 @@ export class VssHttpClient {
      */
     _beginGetLocation(area: string, locationId: string): IPromise<WebApi_Contracts.ApiResourceLocation>;
     private beginGetAreaLocations(area);
-    private getRequestUrl(location, routeValues, queryParams?);
+    protected getRequestUrl(routeTemplate: string, area: string, resource: string, routeValues: any, queryParams?: IDictionaryStringTo<any>): string;
     private replaceRouteValues(routeTemplate, routeValues);
     _getLinkResponseHeaders(xhr: XMLHttpRequest): {
         [relName: string]: string;
     };
 }
-}
-declare module "VSS/XDM.Host" {
-export function createChannel(targetWindow: Window): IXDMChannel;
-/**
-* Manages XDM channels per target window/frame
-*/
-export var channelManager: IXDMChannelManager;
-/**
-* Registered XDM objects
-*/
-export var globalObjectRegistry: IXDMObjectRegistry;
 }
 declare module "TFS/Build/Contracts" {
 import TFS_Core_Contracts = require("TFS/Core/Contracts");
@@ -14542,40 +16807,40 @@ import VSS_Common_Contracts = require("VSS/WebApi/Contracts");
 export interface AgentPoolQueue extends ShallowReference {
     _links: any;
     /**
-    * The pool used by this queue.
-    */
+     * The pool used by this queue.
+     */
     pool: TaskAgentPoolReference;
 }
 export enum AgentStatus {
     /**
-    * Indicates that the build agent cannot be contacted.
-    */
+     * Indicates that the build agent cannot be contacted.
+     */
     Unavailable = 0,
     /**
-    * Indicates that the build agent is currently available.
-    */
+     * Indicates that the build agent is currently available.
+     */
     Available = 1,
     /**
-    * Indicates that the build agent has taken itself offline.
-    */
+     * Indicates that the build agent has taken itself offline.
+     */
     Offline = 2,
 }
 export interface ArtifactResource {
     /**
-    * The type-specific resource data. For example, &quot;#/10002/5/drop&quot;, &quot;$/drops/5&quot;, &quot;\\myshare\myfolder\mydrops\5&quot;
-    */
+     * The type-specific resource data. For example, "#/10002/5/drop", "$/drops/5", "\\myshare\myfolder\mydrops\5"
+     */
     data: string;
     /**
-    * Link to the resource. This might include things like query parameters to download as a zip file
-    */
+     * Link to the resource. This might include things like query parameters to download as a zip file
+     */
     downloadUrl: string;
     /**
-    * The type of the resource: File container, version control folder, UNC path, etc.
-    */
+     * The type of the resource: File container, version control folder, UNC path, etc.
+     */
     type: string;
     /**
-    * Link to the resource
-    */
+     * Link to the resource
+     */
     url: string;
 }
 export enum AuditAction {
@@ -14584,124 +16849,132 @@ export enum AuditAction {
     Delete = 3,
 }
 /**
-* Data representation of a build
-*/
+ * Data representation of a build
+ */
 export interface Build {
     _links: any;
     /**
-    * Build number/name of the build
-    */
+     * Build number/name of the build
+     */
     buildNumber: string;
     /**
-    * The build controller. This should only be set if the definition type is Xaml.
-    */
+     * The build controller. This should only be set if the definition type is Xaml.
+     */
     controller: BuildController;
     /**
-    * The definition associated with the build
-    */
+     * The definition associated with the build
+     */
     definition: DefinitionReference;
     /**
-    * Demands
-    */
+     * Indicates whether the build has been deleted.
+     */
+    deleted: boolean;
+    /**
+     * Demands
+     */
     demands: any[];
     /**
-    * Time that the build was completed
-    */
+     * Time that the build was completed
+     */
     finishTime: Date;
     /**
-    * Id of the build
-    */
+     * Id of the build
+     */
     id: number;
     keepForever: boolean;
     /**
-    * Process or person that last changed the build
-    */
+     * Process or person that last changed the build
+     */
     lastChangedBy: VSS_Common_Contracts.IdentityRef;
     /**
-    * Date the build was last changed
-    */
+     * Date the build was last changed
+     */
     lastChangedDate: Date;
     /**
-    * Log location of the build
-    */
+     * Log location of the build
+     */
     logs: BuildLogReference;
     /**
-    * Orchestration plan for the build
-    */
+     * Orchestration plan for the build
+     */
     orchestrationPlan: TaskOrchestrationPlanReference;
     /**
-    * Parameters for the build
-    */
+     * Parameters for the build
+     */
     parameters: string;
     /**
-    * The build's priority
-    */
+     * The build's priority
+     */
     priority: QueuePriority;
     /**
-    * The team project
-    */
+     * The team project
+     */
     project: TFS_Core_Contracts.TeamProjectReference;
     properties: any;
     /**
-    * The queue. This should only be set if the definition type is Build.
-    */
+     * Quality of the xaml build (good, bad, etc.)
+     */
+    quality: string;
+    /**
+     * The queue. This should only be set if the definition type is Build.
+     */
     queue: AgentPoolQueue;
     /**
-    * Queue option of the build.
-    */
+     * Queue option of the build.
+     */
     queueOptions: QueueOptions;
     /**
-    * The current position of the build in the queue
-    */
+     * The current position of the build in the queue
+     */
     queuePosition: number;
     /**
-    * Time that the build was queued
-    */
+     * Time that the build was queued
+     */
     queueTime: Date;
     /**
-    * Reason that the build was created
-    */
+     * Reason that the build was created
+     */
     reason: BuildReason;
     /**
-    * The repository
-    */
+     * The repository
+     */
     repository: BuildRepository;
     /**
-    * The identity that queued the build
-    */
+     * The identity that queued the build
+     */
     requestedBy: VSS_Common_Contracts.IdentityRef;
     /**
-    * The identity on whose behalf the build was queued
-    */
+     * The identity on whose behalf the build was queued
+     */
     requestedFor: VSS_Common_Contracts.IdentityRef;
     /**
-    * The build result
-    */
+     * The build result
+     */
     result: BuildResult;
     /**
-    * Source branch
-    */
+     * Source branch
+     */
     sourceBranch: string;
     /**
-    * Source version
-    */
+     * Source version
+     */
     sourceVersion: string;
     /**
-    * Time that the build was started
-    */
+     * Time that the build was started
+     */
     startTime: Date;
     /**
-    * Status of the build
-    */
+     * Status of the build
+     */
     status: BuildStatus;
     tags: string[];
     /**
-    * Uri of the build
-    */
+     * Uri of the build
+     */
     uri: string;
     /**
-    * REST url of the build
-    */
+     * REST url of the build
+     */
     url: string;
     validationResults: BuildRequestValidationResult[];
 }
@@ -14724,26 +16997,26 @@ export interface BuildAgent {
 }
 export interface BuildArtifact {
     /**
-    * The artifact id
-    */
+     * The artifact id
+     */
     id: number;
     /**
-    * The name of the artifact
-    */
+     * The name of the artifact
+     */
     name: string;
     /**
-    * The actual resource
-    */
+     * The actual resource
+     */
     resource: ArtifactResource;
 }
 export enum BuildAuthorizationScope {
     /**
-    * The identity used should have build service account permissions scoped to the project collection. This is useful when resources for a single build are spread across multiple projects.
-    */
+     * The identity used should have build service account permissions scoped to the project collection. This is useful when resources for a single build are spread across multiple projects.
+     */
     ProjectCollection = 1,
     /**
-    * The identity used should have build service account permissions scoped to the project in which the build definition resides. This is useful for isolation of build jobs to a particular team project to avoid any unintentional escalation of privilege attacks during a build.
-    */
+     * The identity used should have build service account permissions scoped to the project in which the build definition resides. This is useful for isolation of build jobs to a particular team project to avoid any unintentional escalation of privilege attacks during a build.
+     */
     Project = 2,
 }
 export interface BuildCompletedEvent extends BuildUpdatedEvent {
@@ -14751,77 +17024,81 @@ export interface BuildCompletedEvent extends BuildUpdatedEvent {
 export interface BuildController extends ShallowReference {
     _links: any;
     /**
-    * The date the controller was created.
-    */
+     * The date the controller was created.
+     */
     createdDate: Date;
     /**
-    * The description of the controller.
-    */
+     * The description of the controller.
+     */
     description: string;
     /**
-    * Indicates whether the controller is enabled.
-    */
+     * Indicates whether the controller is enabled.
+     */
     enabled: boolean;
     /**
-    * The status of the controller.
-    */
+     * The status of the controller.
+     */
     status: ControllerStatus;
     /**
-    * The date the controller was last updated.
-    */
+     * The date the controller was last updated.
+     */
     updatedDate: Date;
     /**
-    * The controller's URI.
-    */
+     * The controller's URI.
+     */
     uri: string;
 }
 export interface BuildDefinition extends BuildDefinitionReference {
     _links: any;
     /**
-    * Indicates whether badges are enabled for this definition
-    */
+     * Indicates whether badges are enabled for this definition
+     */
     badgeEnabled: boolean;
     build: BuildDefinitionStep[];
     /**
-    * The build number format
-    */
+     * The build number format
+     */
     buildNumberFormat: string;
     /**
-    * The comment entered when saving the definition
-    */
+     * The comment entered when saving the definition
+     */
     comment: string;
     /**
-    * The date the definition was created
-    */
+     * The date the definition was created
+     */
     createdDate: Date;
     demands: any[];
     /**
-    * The description
-    */
+     * The description
+     */
     description: string;
     /**
-    * The drop location for the definition
-    */
+     * The drop location for the definition
+     */
     dropLocation: string;
     /**
-    * Gets or sets the job authorization scope for builds which are queued against this definition
-    */
+     * Gets or sets the job authorization scope for builds which are queued against this definition
+     */
     jobAuthorizationScope: BuildAuthorizationScope;
     /**
-    * Gets or sets the job execution timeout in minutes for builds which are queued against this definition
-    */
+     * Gets or sets the job execution timeout in minutes for builds which are queued against this definition
+     */
     jobTimeoutInMinutes: number;
     options: BuildOption[];
     properties: any;
     /**
-    * The repository
-    */
+     * The repository
+     */
     repository: BuildRepository;
     retentionRules: RetentionPolicy[];
     triggers: BuildTrigger[];
     variables: {
         [key: string]: BuildDefinitionVariable;
     };
+}
+export interface BuildDefinitionChangedEvent {
+    changeType: AuditAction;
+    definition: BuildDefinition;
 }
 export interface BuildDefinitionChangingEvent {
     changeType: AuditAction;
@@ -14830,20 +17107,20 @@ export interface BuildDefinitionChangingEvent {
 }
 export interface BuildDefinitionReference extends DefinitionReference {
     /**
-    * The author of the definition.
-    */
+     * The author of the definition.
+     */
     authoredBy: VSS_Common_Contracts.IdentityRef;
     /**
-    * If this is a draft definition, it might have a parent
-    */
+     * If this is a draft definition, it might have a parent
+     */
     draftOf: DefinitionReference;
     /**
-    * The quality of the definition document (draft, etc.)
-    */
+     * The quality of the definition document (draft, etc.)
+     */
     quality: DefinitionQuality;
     /**
-    * The default queue which should be used for requests.
-    */
+     * The default queue which should be used for requests.
+     */
     queue: AgentPoolQueue;
 }
 export interface BuildDefinitionRevision {
@@ -14857,30 +17134,30 @@ export interface BuildDefinitionRevision {
 }
 export interface BuildDefinitionSourceProvider {
     /**
-    * Uri of the associated definition
-    */
+     * Uri of the associated definition
+     */
     definitionUri: string;
     /**
-    * fields associated with this build definition
-    */
+     * fields associated with this build definition
+     */
     fields: {
         [key: string]: string;
     };
     /**
-    * Id of this source provider
-    */
+     * Id of this source provider
+     */
     id: number;
     /**
-    * The lst time this source provider was modified
-    */
+     * The lst time this source provider was modified
+     */
     lastModified: Date;
     /**
-    * Name of the source provider
-    */
+     * Name of the source provider
+     */
     name: string;
     /**
-    * Which trigger types are supported by this definition source provider
-    */
+     * Which trigger types are supported by this definition source provider
+     */
     supportedTriggerTypes: DefinitionTriggerType;
 }
 export interface BuildDefinitionStep {
@@ -14912,37 +17189,37 @@ export interface BuildDeployment {
     sourceBuild: ShallowReference;
 }
 /**
-* Represents a build log.
-*/
+ * Represents a build log.
+ */
 export interface BuildLog extends BuildLogReference {
     /**
-    * The date the log was created.
-    */
+     * The date the log was created.
+     */
     createdOn: Date;
     /**
-    * The date the log was last changed.
-    */
+     * The date the log was last changed.
+     */
     lastChangedOn: Date;
     /**
-    * The number of lines in the log.
-    */
+     * The number of lines in the log.
+     */
     lineCount: number;
 }
 /**
-* Data representation of a build log reference
-*/
+ * Data representation of a build log reference
+ */
 export interface BuildLogReference {
     /**
-    * The id of the log.
-    */
+     * The id of the log.
+     */
     id: number;
     /**
-    * The type of the log location.
-    */
+     * The type of the log location.
+     */
     type: string;
     /**
-    * Full link to the log resource.
-    */
+     * Full link to the log resource.
+     */
     url: string;
 }
 export interface BuildOption {
@@ -14992,16 +17269,16 @@ export enum BuildOptionInputType {
 }
 export enum BuildPhaseStatus {
     /**
-    * The state is not known.
-    */
+     * The state is not known.
+     */
     Unknown = 0,
     /**
-    * The build phase completed unsuccessfully.
-    */
+     * The build phase completed unsuccessfully.
+     */
     Failed = 1,
     /**
-    * The build phase completed successfully.
-    */
+     * The build phase completed successfully.
+     */
     Succeeded = 2,
 }
 export interface BuildProcessTemplate {
@@ -15016,77 +17293,87 @@ export interface BuildProcessTemplate {
     url: string;
     version: string;
 }
+export enum BuildQueryOrder {
+    /**
+     * Order by finish time ascending.
+     */
+    FinishTimeAscending = 2,
+    /**
+     * Order by finish time descending.
+     */
+    FinishTimeDescending = 3,
+}
 export enum BuildReason {
     /**
-    * No reason. This value should not be used.
-    */
+     * No reason. This value should not be used.
+     */
     None = 0,
     /**
-    * The build was started manually.
-    */
+     * The build was started manually.
+     */
     Manual = 1,
     /**
-    * The build was started for the trigger TriggerType.ContinuousIntegration.
-    */
+     * The build was started for the trigger TriggerType.ContinuousIntegration.
+     */
     IndividualCI = 2,
     /**
-    * The build was started for the trigger TriggerType.BatchedContinuousIntegration.
-    */
+     * The build was started for the trigger TriggerType.BatchedContinuousIntegration.
+     */
     BatchedCI = 4,
     /**
-    * The build was started for the trigger TriggerType.Schedule.
-    */
+     * The build was started for the trigger TriggerType.Schedule.
+     */
     Schedule = 8,
     /**
-    * The build was created by a user.
-    */
+     * The build was created by a user.
+     */
     UserCreated = 32,
     /**
-    * The build was started manually for private validation.
-    */
+     * The build was started manually for private validation.
+     */
     ValidateShelveset = 64,
     /**
-    * The build was started for the trigger ContinuousIntegrationType.Gated.
-    */
+     * The build was started for the trigger ContinuousIntegrationType.Gated.
+     */
     CheckInShelveset = 128,
     /**
-    * The build was triggered for retention policy purposes.
-    */
+     * The build was triggered for retention policy purposes.
+     */
     Triggered = 175,
     /**
-    * All reasons.
-    */
+     * All reasons.
+     */
     All = 239,
 }
 export interface BuildRepository {
     checkoutSubmodules: boolean;
     /**
-    * Indicates whether to clean the target folder when getting code from the repository. This is a String so that it can reference variables.
-    */
+     * Indicates whether to clean the target folder when getting code from the repository. This is a String so that it can reference variables.
+     */
     clean: string;
     /**
-    * Gets or sets the name of the default branch.
-    */
+     * Gets or sets the name of the default branch.
+     */
     defaultBranch: string;
     id: string;
     /**
-    * Gets or sets the friendly name of the repository.
-    */
+     * Gets or sets the friendly name of the repository.
+     */
     name: string;
     properties: {
         [key: string]: string;
     };
     /**
-    * Gets or sets the root folder.
-    */
+     * Gets or sets the root folder.
+     */
     rootFolder: string;
     /**
-    * Gets or sets the type of the repository.
-    */
+     * Gets or sets the type of the repository.
+     */
     type: string;
     /**
-    * Gets or sets the url of the repository.
-    */
+     * Gets or sets the url of the repository.
+     */
     url: string;
 }
 export interface BuildRequestValidationResult {
@@ -15095,24 +17382,24 @@ export interface BuildRequestValidationResult {
 }
 export enum BuildResult {
     /**
-    * No result
-    */
+     * No result
+     */
     None = 0,
     /**
-    * The build completed successfully.
-    */
+     * The build completed successfully.
+     */
     Succeeded = 2,
     /**
-    * The build completed compilation successfully but had other errors.
-    */
+     * The build completed compilation successfully but had other errors.
+     */
     PartiallySucceeded = 4,
     /**
-    * The build completed unsuccessfully.
-    */
+     * The build completed unsuccessfully.
+     */
     Failed = 8,
     /**
-    * The build was canceled before starting.
-    */
+     * The build was canceled before starting.
+     */
     Canceled = 32,
 }
 export interface BuildsDeletedEvent {
@@ -15139,32 +17426,32 @@ export interface BuildStartedEvent extends BuildUpdatedEvent {
 }
 export enum BuildStatus {
     /**
-    * No status.
-    */
+     * No status.
+     */
     None = 0,
     /**
-    * The build is currently in progress.
-    */
+     * The build is currently in progress.
+     */
     InProgress = 1,
     /**
-    * The build has completed.
-    */
+     * The build has completed.
+     */
     Completed = 2,
     /**
-    * The build is cancelling
-    */
+     * The build is cancelling
+     */
     Cancelling = 4,
     /**
-    * The build is inactive in the queue.
-    */
+     * The build is inactive in the queue.
+     */
     Postponed = 8,
     /**
-    * The build has not yet started.
-    */
+     * The build has not yet started.
+     */
     NotStarted = 32,
     /**
-    * All status.
-    */
+     * All status.
+     */
     All = 47,
 }
 export interface BuildSummary {
@@ -15187,40 +17474,40 @@ export interface BuildWorkspace {
     mappings: MappingDetails[];
 }
 /**
-* Represents a change associated with a build.
-*/
+ * Represents a change associated with a build.
+ */
 export interface Change {
     /**
-    * The author of the change.
-    */
+     * The author of the change.
+     */
     author: VSS_Common_Contracts.IdentityRef;
     /**
-    * The location of a user-friendly representation of the resource.
-    */
+     * The location of a user-friendly representation of the resource.
+     */
     displayUri: string;
     /**
-    * Something that identifies the change. For a commit, this would be the SHA1. For a TFVC changeset, this would be the changeset id.
-    */
+     * Something that identifies the change. For a commit, this would be the SHA1. For a TFVC changeset, this would be the changeset id.
+     */
     id: string;
     /**
-    * The location of the full representation of the resource.
-    */
+     * The location of the full representation of the resource.
+     */
     location: string;
     /**
-    * A description of the change. This might be a commit message or changeset description.
-    */
+     * A description of the change. This might be a commit message or changeset description.
+     */
     message: string;
     /**
-    * Indicates whether the message was truncated
-    */
+     * Indicates whether the message was truncated
+     */
     messageTruncated: boolean;
     /**
-    * A timestamp for the change.
-    */
+     * A timestamp for the change.
+     */
     timestamp: Date;
     /**
-    * The type of change. &quot;commit&quot;, &quot;changeset&quot;, etc.
-    */
+     * The type of change. "commit", "changeset", etc.
+     */
     type: string;
 }
 export interface ConsoleLogEvent extends RealtimeBuildEvent {
@@ -15230,12 +17517,12 @@ export interface ConsoleLogEvent extends RealtimeBuildEvent {
 }
 export interface ContinuousDeploymentDefinition {
     /**
-    * The connected service associated with the continuous deployment
-    */
+     * The connected service associated with the continuous deployment
+     */
     connectedService: TFS_Core_Contracts.WebApiConnectedServiceRef;
     /**
-    * The definition associated with the continuous deployment
-    */
+     * The definition associated with the continuous deployment
+     */
     definition: ShallowReference;
     gitBranch: string;
     hostedServiceName: string;
@@ -15252,16 +17539,16 @@ export interface ContinuousIntegrationTrigger extends BuildTrigger {
 }
 export enum ControllerStatus {
     /**
-    * Indicates that the build controller cannot be contacted.
-    */
+     * Indicates that the build controller cannot be contacted.
+     */
     Unavailable = 0,
     /**
-    * Indicates that the build controller is currently available.
-    */
+     * Indicates that the build controller is currently available.
+     */
     Available = 1,
     /**
-    * Indicates that the build controller has taken itself offline.
-    */
+     * Indicates that the build controller has taken itself offline.
+     */
     Offline = 2,
 }
 export enum DefinitionQuality {
@@ -15270,71 +17557,71 @@ export enum DefinitionQuality {
 }
 export enum DefinitionQueueStatus {
     /**
-    * When enabled the definition queue allows builds to be queued by users, the system will queue scheduled, gated and continuous integration builds, and the queued builds will be started by the system.
-    */
+     * When enabled the definition queue allows builds to be queued by users, the system will queue scheduled, gated and continuous integration builds, and the queued builds will be started by the system.
+     */
     Enabled = 0,
     /**
-    * When paused the definition queue allows builds to be queued by users and the system will queue scheduled, gated and continuous integration builds. Builds in the queue will not be started by the system.
-    */
+     * When paused the definition queue allows builds to be queued by users and the system will queue scheduled, gated and continuous integration builds. Builds in the queue will not be started by the system.
+     */
     Paused = 1,
     /**
-    * When disabled the definition queue will not allow builds to be queued by users and the system will not queue scheduled, gated or continuous integration builds. Builds already in the queue will not be started by the system.
-    */
+     * When disabled the definition queue will not allow builds to be queued by users and the system will not queue scheduled, gated or continuous integration builds. Builds already in the queue will not be started by the system.
+     */
     Disabled = 2,
 }
 /**
-* A reference to a definition.
-*/
+ * A reference to a definition.
+ */
 export interface DefinitionReference extends ShallowReference {
     /**
-    * The project.
-    */
+     * The project.
+     */
     project: TFS_Core_Contracts.TeamProjectReference;
     /**
-    * If builds can be queued from this definition
-    */
+     * If builds can be queued from this definition
+     */
     queueStatus: DefinitionQueueStatus;
     /**
-    * The definition revision number.
-    */
+     * The definition revision number.
+     */
     revision: number;
     /**
-    * The type of the definition.
-    */
+     * The type of the definition.
+     */
     type: DefinitionType;
     /**
-    * The Uri of the definition
-    */
+     * The Uri of the definition
+     */
     uri: string;
 }
 export enum DefinitionTriggerType {
     /**
-    * Manual builds only.
-    */
+     * Manual builds only.
+     */
     None = 1,
     /**
-    * A build should be started for each changeset.
-    */
+     * A build should be started for each changeset.
+     */
     ContinuousIntegration = 2,
     /**
-    * A build should be started for multiple changesets at a time at a specified interval.
-    */
+     * A build should be started for multiple changesets at a time at a specified interval.
+     */
     BatchedContinuousIntegration = 4,
     /**
-    * A build should be started on a specified schedule whether or not changesets exist.
-    */
+     * A build should be started on a specified schedule whether or not changesets exist.
+     */
     Schedule = 8,
     /**
-    * A validation build should be started for each check-in.
-    */
+     * A validation build should be started for each check-in.
+     */
     GatedCheckIn = 16,
     /**
-    * A validation build should be started for each batch of check-ins.
-    */
+     * A validation build should be started for each batch of check-ins.
+     */
     BatchedGatedCheckIn = 32,
     /**
-    * All types.
-    */
+     * All types.
+     */
     All = 63,
 }
 export enum DefinitionType {
@@ -15343,77 +17630,101 @@ export enum DefinitionType {
 }
 export enum DeleteOptions {
     /**
-    * No data should be deleted. This value should not be used.
-    */
+     * No data should be deleted. This value should not be used.
+     */
     None = 0,
     /**
-    * The drop location should be deleted.
-    */
+     * The drop location should be deleted.
+     */
     DropLocation = 1,
     /**
-    * The test results should be deleted.
-    */
+     * The test results should be deleted.
+     */
     TestResults = 2,
     /**
-    * The version control label should be deleted.
-    */
+     * The version control label should be deleted.
+     */
     Label = 4,
     /**
-    * The build should be deleted.
-    */
+     * The build should be deleted.
+     */
     Details = 8,
     /**
-    * Published symbols should be deleted.
-    */
+     * Published symbols should be deleted.
+     */
     Symbols = 16,
     /**
-    * All data should be deleted.
-    */
+     * All data should be deleted.
+     */
     All = 31,
+}
+/**
+ * Represents the data from the build information nodes for type "DeploymentInformation" for xaml builds
+ */
+export interface Deployment {
+    type: string;
+}
+/**
+ * Deployment iformation for type "Build"
+ */
+export interface DeploymentBuild extends Deployment {
+    buildId: number;
+}
+/**
+ * Deployment iformation for type "Deploy"
+ */
+export interface DeploymentDeploy extends Deployment {
+    message: string;
+}
+/**
+ * Deployment iformation for type "Test"
+ */
+export interface DeploymentTest extends Deployment {
+    runId: number;
 }
 export enum GetOption {
     /**
-    * Use the latest changeset at the time the build is queued.
-    */
+     * Use the latest changeset at the time the build is queued.
+     */
     LatestOnQueue = 0,
     /**
-    * Use the latest changeset at the time the build is started.
-    */
+     * Use the latest changeset at the time the build is started.
+     */
     LatestOnBuild = 1,
     /**
-    * A user-specified version has been supplied.
-    */
+     * A user-specified version has been supplied.
+     */
     Custom = 2,
 }
 /**
-* Data representation of an information node associated with a build
-*/
+ * Data representation of an information node associated with a build
+ */
 export interface InformationNode {
     /**
-    * Fields of the information node
-    */
+     * Fields of the information node
+     */
     fields: {
         [key: string]: string;
     };
     /**
-    * Process or person that last modified this node
-    */
+     * Process or person that last modified this node
+     */
     lastModifiedBy: string;
     /**
-    * Date this node was last modified
-    */
+     * Date this node was last modified
+     */
     lastModifiedDate: Date;
     /**
-    * Node Id of this information node
-    */
+     * Node Id of this information node
+     */
     nodeId: number;
     /**
-    * Id of parent node (xml tree)
-    */
+     * Id of parent node (xml tree)
+     */
     parentId: number;
     /**
-    * The type of the information node
-    */
+     * The type of the information node
+     */
     type: string;
 }
 export interface Issue {
@@ -15434,66 +17745,80 @@ export interface MappingDetails {
 }
 export enum ProcessTemplateType {
     /**
-    * Indicates a custom template.
-    */
+     * Indicates a custom template.
+     */
     Custom = 0,
     /**
-    * Indicates a default template.
-    */
+     * Indicates a default template.
+     */
     Default = 1,
     /**
-    * Indicates an upgrade template.
-    */
+     * Indicates an upgrade template.
+     */
     Upgrade = 2,
 }
 export interface PropertyValue {
     /**
-    * Guid of identity that changed this property value
-    */
+     * Guid of identity that changed this property value
+     */
     changedBy: string;
     /**
-    * The date this property value was changed
-    */
+     * The date this property value was changed
+     */
     changedDate: Date;
     /**
-    * Name in the name value mapping
-    */
+     * Name in the name value mapping
+     */
     propertyName: string;
     /**
-    * Value in the name value mapping
-    */
+     * Value in the name value mapping
+     */
     value: any;
+}
+export enum QueryDeletedOption {
+    /**
+     * Include only non-deleted builds.
+     */
+    ExcludeDeleted = 0,
+    /**
+     * Include deleted and non-deleted builds.
+     */
+    IncludeDeleted = 1,
+    /**
+     * Include only deleted builds.
+     */
+    OnlyDeleted = 2,
 }
 export enum QueueOptions {
     /**
-    * No queue options
-    */
+     * No queue options
+     */
     None = 0,
     /**
-    * Create a plan Id for the build, do not run it
-    */
+     * Create a plan Id for the build, do not run it
+     */
     DoNotRun = 1,
 }
 export enum QueuePriority {
     /**
-    * Low priority.
-    */
+     * Low priority.
+     */
     Low = 5,
     /**
-    * Below normal priority.
-    */
+     * Below normal priority.
+     */
     BelowNormal = 4,
     /**
-    * Normal priority.
-    */
+     * Normal priority.
+     */
     Normal = 3,
     /**
-    * Above normal priority.
-    */
+     * Above normal priority.
+     */
     AboveNormal = 2,
     /**
-    * High priority.
-    */
+     * High priority.
+     */
     High = 1,
 }
 export interface RealtimeBuildEvent {
@@ -15501,16 +17826,16 @@ export interface RealtimeBuildEvent {
 }
 export interface RequestReference {
     /**
-    * Id of the resource
-    */
+     * Id of the resource
+     */
     id: number;
     /**
-    * Name of the requestor
-    */
+     * Name of the requestor
+     */
     requestedFor: VSS_Common_Contracts.IdentityRef;
     /**
-    * Full http link to the resource
-    */
+     * Full http link to the resource
+     */
     url: string;
 }
 export interface RetentionPolicy {
@@ -15521,62 +17846,62 @@ export interface RetentionPolicy {
 export interface Schedule {
     branchFilters: string[];
     /**
-    * Days for a build (flags enum for days of the week)
-    */
+     * Days for a build (flags enum for days of the week)
+     */
     daysToBuild: ScheduleDays;
     /**
-    * The Job Id of the Scheduled job that will queue the scheduled build. Since a single trigger can have multiple schedules and we want a single job to process a single schedule (since each schedule has a list of branches to build), the schedule itself needs to define the Job Id. This value will be filled in when a definition is added or updated.  The UI does not provide it or use it.
-    */
+     * The Job Id of the Scheduled job that will queue the scheduled build. Since a single trigger can have multiple schedules and we want a single job to process a single schedule (since each schedule has a list of branches to build), the schedule itself needs to define the Job Id. This value will be filled in when a definition is added or updated.  The UI does not provide it or use it.
+     */
     scheduleJobId: string;
     /**
-    * Local timezone hour to start
-    */
+     * Local timezone hour to start
+     */
     startHours: number;
     /**
-    * Local timezone minute to start
-    */
+     * Local timezone minute to start
+     */
     startMinutes: number;
     /**
-    * Time zone of the build schedule (string representation of the time zone id)
-    */
+     * Time zone of the build schedule (string representation of the time zone id)
+     */
     timeZoneId: string;
 }
 export enum ScheduleDays {
     /**
-    * Do not run.
-    */
+     * Do not run.
+     */
     None = 0,
     /**
-    * Run on Monday.
-    */
+     * Run on Monday.
+     */
     Monday = 1,
     /**
-    * Run on Tuesday.
-    */
+     * Run on Tuesday.
+     */
     Tuesday = 2,
     /**
-    * Run on Wednesday.
-    */
+     * Run on Wednesday.
+     */
     Wednesday = 4,
     /**
-    * Run on Thursday.
-    */
+     * Run on Thursday.
+     */
     Thursday = 8,
     /**
-    * Run on Friday.
-    */
+     * Run on Friday.
+     */
     Friday = 16,
     /**
-    * Run on Saturday.
-    */
+     * Run on Saturday.
+     */
     Saturday = 32,
     /**
-    * Run on Sunday.
-    */
+     * Run on Sunday.
+     */
     Sunday = 64,
     /**
-    * Run on all days of the week.
-    */
+     * Run on all days of the week.
+     */
     All = 127,
 }
 export interface ScheduleTrigger extends BuildTrigger {
@@ -15584,29 +17909,29 @@ export interface ScheduleTrigger extends BuildTrigger {
 }
 export enum ServiceHostStatus {
     /**
-    * The service host is currently connected and accepting commands.
-    */
+     * The service host is currently connected and accepting commands.
+     */
     Online = 1,
     /**
-    * The service host is currently disconnected and not accepting commands.
-    */
+     * The service host is currently disconnected and not accepting commands.
+     */
     Offline = 2,
 }
 /**
-* An abstracted reference to some other resource. This class is used to provide the build data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
-*/
+ * An abstracted reference to some other resource. This class is used to provide the build data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
+ */
 export interface ShallowReference {
     /**
-    * Id of the resource
-    */
+     * Id of the resource
+     */
     id: number;
     /**
-    * Name of the linked resource (definition name, controller name, etc.)
-    */
+     * Name of the linked resource (definition name, controller name, etc.)
+     */
     name: string;
     /**
-    * Full http link to the resource
-    */
+     * Full http link to the resource
+     */
     url: string;
 }
 export interface TaskAgentPoolReference {
@@ -15676,104 +18001,104 @@ export enum ValidationResult {
     Error = 2,
 }
 /**
-* Mapping for a workspace
-*/
+ * Mapping for a workspace
+ */
 export interface WorkspaceMapping {
     /**
-    * Uri of the associated definition
-    */
+     * Uri of the associated definition
+     */
     definitionUri: string;
     /**
-    * Depth of this mapping
-    */
+     * Depth of this mapping
+     */
     depth: number;
     /**
-    * local location of the definition
-    */
+     * local location of the definition
+     */
     localItem: string;
     /**
-    * type of workspace mapping
-    */
+     * type of workspace mapping
+     */
     mappingType: WorkspaceMappingType;
     /**
-    * Server location of the definition
-    */
+     * Server location of the definition
+     */
     serverItem: string;
     /**
-    * Id of the workspace
-    */
+     * Id of the workspace
+     */
     workspaceId: number;
 }
 export enum WorkspaceMappingType {
     /**
-    * The path is mapped in the workspace.
-    */
+     * The path is mapped in the workspace.
+     */
     Map = 0,
     /**
-    * The path is cloaked in the workspace.
-    */
+     * The path is cloaked in the workspace.
+     */
     Cloak = 1,
 }
 export interface WorkspaceTemplate {
     /**
-    * Uri of the associated definition
-    */
+     * Uri of the associated definition
+     */
     definitionUri: string;
     /**
-    * The identity that last modified this template
-    */
+     * The identity that last modified this template
+     */
     lastModifiedBy: string;
     /**
-    * The last time this template was modified
-    */
+     * The last time this template was modified
+     */
     lastModifiedDate: Date;
     /**
-    * List of workspace mappings
-    */
+     * List of workspace mappings
+     */
     mappings: WorkspaceMapping[];
     /**
-    * Id of the workspace for this template
-    */
+     * Id of the workspace for this template
+     */
     workspaceId: number;
 }
 export interface XamlBuildDefinition extends DefinitionReference {
     _links: any;
     /**
-    * Batch size of the definition
-    */
+     * Batch size of the definition
+     */
     batchSize: number;
     buildArgs: string;
     /**
-    * The continuous integration quiet period
-    */
+     * The continuous integration quiet period
+     */
     continuousIntegrationQuietPeriod: number;
     /**
-    * The build controller
-    */
+     * The build controller
+     */
     controller: BuildController;
     /**
-    * The date this definition was created
-    */
+     * The date this definition was created
+     */
     createdOn: Date;
     /**
-    * Default drop location for builds from this definition
-    */
+     * Default drop location for builds from this definition
+     */
     defaultDropLocation: string;
     /**
-    * Description of the definition
-    */
+     * Description of the definition
+     */
     description: string;
     /**
-    * The last build on this definition
-    */
+     * The last build on this definition
+     */
     lastBuild: ShallowReference;
     /**
-    * The reasons supported by the template
-    */
+     * The reasons supported by the template
+     */
     supportedReasons: BuildReason;
     /**
-    * How builds are triggered from this definition
-    */
+     * How builds are triggered from this definition
+     */
     triggerType: DefinitionTriggerType;
 }
 export var TypeInfo: {
@@ -15819,6 +18144,9 @@ export var TypeInfo: {
         fields: any;
     };
     BuildDefinition: {
+        fields: any;
+    };
+    BuildDefinitionChangedEvent: {
         fields: any;
     };
     BuildDefinitionChangingEvent: {
@@ -15885,6 +18213,12 @@ export var TypeInfo: {
     };
     BuildProcessTemplate: {
         fields: any;
+    };
+    BuildQueryOrder: {
+        enumValues: {
+            "finishTimeAscending": number;
+            "finishTimeDescending": number;
+        };
     };
     BuildReason: {
         enumValues: {
@@ -16013,6 +18347,18 @@ export var TypeInfo: {
             "all": number;
         };
     };
+    Deployment: {
+        fields: any;
+    };
+    DeploymentBuild: {
+        fields: any;
+    };
+    DeploymentDeploy: {
+        fields: any;
+    };
+    DeploymentTest: {
+        fields: any;
+    };
     GetOption: {
         enumValues: {
             "latestOnQueue": number;
@@ -16044,6 +18390,13 @@ export var TypeInfo: {
     };
     PropertyValue: {
         fields: any;
+    };
+    QueryDeletedOption: {
+        enumValues: {
+            "excludeDeleted": number;
+            "includeDeleted": number;
+            "onlyDeleted": number;
+        };
     };
     QueueOptions: {
         enumValues: {
@@ -16161,12 +18514,13 @@ export var TypeInfo: {
 }
 declare module "TFS/Build/RestClient" {
 import Contracts = require("TFS/Build/Contracts");
+import VSS_Common_Contracts = require("VSS/WebApi/Contracts");
 import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
     static serviceInstanceId: string;
     constructor(rootRequestPath: string);
     /**
-     * Associates an artifact with a build
+     * [Preview API] Associates an artifact with a build
      *
      * @param {Contracts.BuildArtifact} artifact
      * @param {number} buildId
@@ -16175,7 +18529,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createArtifact(artifact: Contracts.BuildArtifact, buildId: number, project?: string): IPromise<Contracts.BuildArtifact>;
     /**
-     * Gets a specific artifact for a build
+     * [Preview API] Gets a specific artifact for a build
      *
      * @param {number} buildId
      * @param {string} artifactName
@@ -16184,7 +18538,16 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getArtifact(buildId: number, artifactName: string, project?: string): IPromise<Contracts.BuildArtifact>;
     /**
-     * Gets all artifacts for a build
+     * [Preview API] Gets a specific artifact for a build
+     *
+     * @param {number} buildId
+     * @param {string} artifactName
+     * @param {string} project - Project ID or project name
+     * @return IPromise<ArrayBuffer>
+     */
+    getArtifactContentZip(buildId: number, artifactName: string, project?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Gets all artifacts for a build
      *
      * @param {number} buildId
      * @param {string} project - Project ID or project name
@@ -16192,6 +18555,8 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getArtifacts(buildId: number, project?: string): IPromise<Contracts.BuildArtifact[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project
      * @param {number} definitionId
      * @param {string} branchName
@@ -16199,7 +18564,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBadge(project: string, definitionId: number, branchName?: string): IPromise<string>;
     /**
-     * Deletes a build
+     * [Preview API] Deletes a build
      *
      * @param {number} buildId
      * @param {string} project - Project ID or project name
@@ -16207,7 +18572,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteBuild(buildId: number, project?: string): IPromise<void>;
     /**
-     * Gets a build
+     * [Preview API] Gets a build
      *
      * @param {number} buildId
      * @param {string} project - Project ID or project name
@@ -16216,7 +18581,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBuild(buildId: number, project?: string, propertyFilters?: string): IPromise<Contracts.Build>;
     /**
-     * Gets builds
+     * [Preview API] Gets builds
      *
      * @param {string} project - Project ID or project name
      * @param {number[]} definitions - A comma-delimited list of definition ids
@@ -16233,11 +18598,14 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      * @param {Contracts.DefinitionType} type - The definition type
      * @param {number} top - The maximum number of builds to retrieve
      * @param {string} continuationToken
+     * @param {number} maxBuildsPerDefinition
+     * @param {Contracts.QueryDeletedOption} deletedFilter
+     * @param {Contracts.BuildQueryOrder} queryOrder
      * @return IPromise<Contracts.Build[]>
      */
-    getBuilds(project?: string, definitions?: number[], queues?: number[], buildNumber?: string, minFinishTime?: Date, maxFinishTime?: Date, requestedFor?: string, reasonFilter?: Contracts.BuildReason, statusFilter?: Contracts.BuildStatus, resultFilter?: Contracts.BuildResult, tagFilters?: string[], properties?: string[], type?: Contracts.DefinitionType, top?: number, continuationToken?: string): IPromise<Contracts.Build[]>;
+    getBuilds(project?: string, definitions?: number[], queues?: number[], buildNumber?: string, minFinishTime?: Date, maxFinishTime?: Date, requestedFor?: string, reasonFilter?: Contracts.BuildReason, statusFilter?: Contracts.BuildStatus, resultFilter?: Contracts.BuildResult, tagFilters?: string[], properties?: string[], type?: Contracts.DefinitionType, top?: number, continuationToken?: string, maxBuildsPerDefinition?: number, deletedFilter?: Contracts.QueryDeletedOption, queryOrder?: Contracts.BuildQueryOrder): IPromise<Contracts.Build[]>;
     /**
-     * Queues a build
+     * [Preview API] Queues a build
      *
      * @param {Contracts.Build} build
      * @param {string} project - Project ID or project name
@@ -16246,7 +18614,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     queueBuild(build: Contracts.Build, project?: string, ignoreWarnings?: boolean): IPromise<Contracts.Build>;
     /**
-     * Updates a build
+     * [Preview API] Updates a build
      *
      * @param {Contracts.Build} build
      * @param {number} buildId
@@ -16255,7 +18623,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateBuild(build: Contracts.Build, buildId: number, project?: string): IPromise<Contracts.Build>;
     /**
-     * Gets the changes associated with a build
+     * [Preview API] Gets the changes associated with a build
      *
      * @param {string} project - Project ID or project name
      * @param {number} buildId
@@ -16264,21 +18632,21 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBuildCommits(project: string, buildId: number, top?: number): IPromise<Contracts.Change[]>;
     /**
-     * Gets a controller
+     * [Preview API] Gets a controller
      *
      * @param {number} controllerId
      * @return IPromise<Contracts.BuildController>
      */
     getBuildController(controllerId: number): IPromise<Contracts.BuildController>;
     /**
-     * Gets controller, optionally filtered by name
+     * [Preview API] Gets controller, optionally filtered by name
      *
      * @param {string} name
      * @return IPromise<Contracts.BuildController[]>
      */
     getBuildControllers(name?: string): IPromise<Contracts.BuildController[]>;
     /**
-     * Creates a new definition
+     * [Preview API] Creates a new definition
      *
      * @param {Contracts.BuildDefinition} definition
      * @param {string} project - Project ID or project name
@@ -16288,7 +18656,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createDefinition(definition: Contracts.BuildDefinition, project?: string, definitionToCloneId?: number, definitionToCloneRevision?: number): IPromise<Contracts.BuildDefinition>;
     /**
-     * Deletes a definition
+     * [Preview API] Deletes a definition and all associated builds
      *
      * @param {number} definitionId
      * @param {string} project - Project ID or project name
@@ -16296,7 +18664,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteDefinition(definitionId: number, project?: string): IPromise<void>;
     /**
-     * Gets a definition, optionally at a specific revision
+     * [Preview API] Gets a definition, optionally at a specific revision
      *
      * @param {number} definitionId
      * @param {string} project - Project ID or project name
@@ -16306,7 +18674,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getDefinition(definitionId: number, project?: string, revision?: number, propertyFilters?: string[]): IPromise<Contracts.DefinitionReference>;
     /**
-     * Gets definitions, optionally filtered by name
+     * [Preview API] Gets definitions, optionally filtered by name
      *
      * @param {string} project - Project ID or project name
      * @param {string} name
@@ -16315,16 +18683,37 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getDefinitions(project?: string, name?: string, type?: Contracts.DefinitionType): IPromise<Contracts.DefinitionReference[]>;
     /**
-     * Updates an existing definition
+     * [Preview API] Updates an existing definition
      *
      * @param {Contracts.BuildDefinition} definition
      * @param {number} definitionId
      * @param {string} project - Project ID or project name
+     * @param {number} secretsSourceDefinitionId
+     * @param {number} secretsSourceDefinitionRevision
      * @return IPromise<Contracts.BuildDefinition>
      */
-    updateDefinition(definition: Contracts.BuildDefinition, definitionId: number, project?: string): IPromise<Contracts.BuildDefinition>;
+    updateDefinition(definition: Contracts.BuildDefinition, definitionId: number, project?: string, secretsSourceDefinitionId?: number, secretsSourceDefinitionRevision?: number): IPromise<Contracts.BuildDefinition>;
     /**
-     * Gets logs for a build
+     * [Preview API] Gets the deployment information associated with a build
+     *
+     * @param {string} project - Project ID or project name
+     * @param {number} buildId
+     * @return IPromise<Contracts.Deployment[]>
+     */
+    getBuildDeployments(project: string, buildId: number): IPromise<Contracts.Deployment[]>;
+    /**
+     * [Preview API] Gets a log
+     *
+     * @param {string} project - Project ID or project name
+     * @param {number} buildId
+     * @param {number} logId
+     * @param {number} startLine
+     * @param {number} endLine
+     * @return IPromise<ArrayBuffer>
+     */
+    getBuildLog(project: string, buildId: number, logId: number, startLine?: number, endLine?: number): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Gets logs for a build
      *
      * @param {string} project - Project ID or project name
      * @param {number} buildId
@@ -16332,39 +18721,49 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBuildLogs(project: string, buildId: number): IPromise<Contracts.BuildLog[]>;
     /**
+     * [Preview API] Gets logs for a build
+     *
+     * @param {string} project - Project ID or project name
+     * @param {number} buildId
+     * @return IPromise<ArrayBuffer>
+     */
+    getBuildLogsZip(project: string, buildId: number): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API]
+     *
      * @return IPromise<Contracts.BuildOptionDefinition[]>
      */
     getBuildOptionDefinitions(): IPromise<Contracts.BuildOptionDefinition[]>;
     /**
-     * Creates a build queue
+     * [Preview API] Creates a build queue
      *
      * @param {Contracts.AgentPoolQueue} queue
      * @return IPromise<Contracts.AgentPoolQueue>
      */
     createQueue(queue: Contracts.AgentPoolQueue): IPromise<Contracts.AgentPoolQueue>;
     /**
-     * Deletes a build queue
+     * [Preview API] Deletes a build queue
      *
      * @param {number} id
      * @return IPromise<void>
      */
     deleteQueue(id: number): IPromise<void>;
     /**
-     * Gets a queue
+     * [Preview API] Gets a queue
      *
      * @param {number} controllerId
      * @return IPromise<Contracts.AgentPoolQueue>
      */
     getAgentPoolQueue(controllerId: number): IPromise<Contracts.AgentPoolQueue>;
     /**
-     * Gets queues, optionally filtered by name
+     * [Preview API] Gets queues, optionally filtered by name
      *
      * @param {string} name
      * @return IPromise<Contracts.AgentPoolQueue[]>
      */
     getQueues(name?: string): IPromise<Contracts.AgentPoolQueue[]>;
     /**
-     * Gets revisions of a definition
+     * [Preview API] Gets revisions of a definition
      *
      * @param {string} project - Project ID or project name
      * @param {number} definitionId
@@ -16372,18 +18771,20 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getDefinitionRevisions(project: string, definitionId: number): IPromise<Contracts.BuildDefinitionRevision[]>;
     /**
+     * [Preview API]
+     *
      * @return IPromise<Contracts.BuildSettings>
      */
     getBuildSettings(): IPromise<Contracts.BuildSettings>;
     /**
-     * Updates the build settings
+     * [Preview API] Updates the build settings
      *
      * @param {Contracts.BuildSettings} settings
      * @return IPromise<Contracts.BuildSettings>
      */
     updateBuildSettings(settings: Contracts.BuildSettings): IPromise<Contracts.BuildSettings>;
     /**
-     * Adds a tag to a build
+     * [Preview API] Adds a tag to a build
      *
      * @param {string} project - Project ID or project name
      * @param {number} buildId
@@ -16392,7 +18793,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     addBuildTag(project: string, buildId: number, tag: string): IPromise<string[]>;
     /**
-     * Adds tag to a build
+     * [Preview API] Adds tag to a build
      *
      * @param {string[]} tags
      * @param {string} project - Project ID or project name
@@ -16401,7 +18802,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     addBuildTags(tags: string[], project: string, buildId: number): IPromise<string[]>;
     /**
-     * Deletes a tag from a build
+     * [Preview API] Deletes a tag from a build
      *
      * @param {string} project - Project ID or project name
      * @param {number} buildId
@@ -16410,7 +18811,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteBuildTag(project: string, buildId: number, tag: string): IPromise<string[]>;
     /**
-     * Gets the tags for a build
+     * [Preview API] Gets the tags for a build
      *
      * @param {string} project - Project ID or project name
      * @param {number} buildId
@@ -16418,12 +18819,14 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBuildTags(project: string, buildId: number): IPromise<string[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @return IPromise<string[]>
      */
     getTags(project: string): IPromise<string[]>;
     /**
-     * Deletes a definition template
+     * [Preview API] Deletes a definition template
      *
      * @param {string} project - Project ID or project name
      * @param {string} templateId
@@ -16431,7 +18834,7 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteTemplate(project: string, templateId: string): IPromise<void>;
     /**
-     * Gets definition template filtered by id
+     * [Preview API] Gets definition template filtered by id
      *
      * @param {string} project - Project ID or project name
      * @param {string} templateId
@@ -16439,12 +18842,14 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTemplate(project: string, templateId: string): IPromise<Contracts.BuildDefinitionTemplate>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @return IPromise<Contracts.BuildDefinitionTemplate[]>
      */
     getTemplates(project: string): IPromise<Contracts.BuildDefinitionTemplate[]>;
     /**
-     * Saves a definition template
+     * [Preview API] Saves a definition template
      *
      * @param {Contracts.BuildDefinitionTemplate} template
      * @param {string} project - Project ID or project name
@@ -16453,38 +18858,68 @@ export class BuildHttpClient extends VSS_WebApi.VssHttpClient {
      */
     saveTemplate(template: Contracts.BuildDefinitionTemplate, project: string, templateId: string): IPromise<Contracts.BuildDefinitionTemplate>;
     /**
-     * Gets details for a build
+     * [Preview API] Gets details for a build
      *
      * @param {string} project - Project ID or project name
      * @param {number} buildId
      * @param {string} timelineId
+     * @param {number} changeId
      * @return IPromise<Contracts.Timeline>
      */
-    getBuildTimeline(project: string, buildId: number, timelineId?: string): IPromise<Contracts.Timeline>;
+    getBuildTimeline(project: string, buildId: number, timelineId?: string, changeId?: number): IPromise<Contracts.Timeline>;
+    /**
+     * [Preview API] Gets the work item ids associated with a build
+     *
+     * @param {string} project - Project ID or project name
+     * @param {number} buildId
+     * @param {number} top - The maximum number of workitems to return
+     * @return IPromise<VSS_Common_Contracts.ResourceRef[]>
+     */
+    getBuildWorkItemsRefs(project: string, buildId: number, top?: number): IPromise<VSS_Common_Contracts.ResourceRef[]>;
+    /**
+     * [Preview API] Gets the work item ids associated with build commits
+     *
+     * @param {string[]} commitIds
+     * @param {string} project - Project ID or project name
+     * @param {number} buildId
+     * @param {number} top - The maximum number of workitems to return, also number of commits to consider if commitids are not sent
+     * @return IPromise<VSS_Common_Contracts.ResourceRef[]>
+     */
+    getBuildWorkItemsRefsFromCommits(commitIds: string[], project: string, buildId: number, top?: number): IPromise<VSS_Common_Contracts.ResourceRef[]>;
 }
 }
 declare module "TFS/Core/Contracts" {
 import VSS_Common_Contracts = require("VSS/WebApi/Contracts");
 export enum ConnectedServiceKind {
     /**
-    * Custom or unknown service
-    */
+     * Custom or unknown service
+     */
     Custom = 0,
     /**
-    * Azure Subscription
-    */
+     * Azure Subscription
+     */
     AzureSubscription = 1,
     /**
-    * Chef Connection
-    */
+     * Chef Connection
+     */
     Chef = 2,
     /**
-    * Generic Connection
-    */
+     * Generic Connection
+     */
     Generic = 3,
 }
 export interface IdentityData {
     identityIds: string[];
+}
+export interface Process extends ProcessReference {
+    _links: any;
+    description: string;
+    id: string;
+    isDefault: boolean;
+}
+export interface ProcessReference {
+    name: string;
+    url: string;
 }
 export enum ProjectChangeType {
     Modified = 0,
@@ -16492,8 +18927,8 @@ export enum ProjectChangeType {
     Added = 2,
 }
 /**
-* Contains information of the project
-*/
+ * Contains information of the project
+ */
 export interface ProjectInfo {
     abbreviation: string;
     description: string;
@@ -16502,8 +18937,8 @@ export interface ProjectInfo {
     name: string;
     properties: ProjectProperty[];
     /**
-    * Current revision of the project
-    */
+     * Current revision of the project
+     */
     revision: number;
     state: any;
     uri: string;
@@ -16519,22 +18954,22 @@ export interface ProjectProperty {
 }
 export interface Proxy {
     /**
-    * This is a description string
-    */
+     * This is a description string
+     */
     description: string;
     /**
-    * The friendly name of the server
-    */
+     * The friendly name of the server
+     */
     friendlyName: string;
     globalDefault: boolean;
     /**
-    * This is a string representation of the site that the proxy server is located in (e.g. &quot;NA-WA-RED&quot;)
-    */
+     * This is a string representation of the site that the proxy server is located in (e.g. "NA-WA-RED")
+     */
     site: string;
     siteDefault: boolean;
     /**
-    * The URL of the proxy server
-    */
+     * The URL of the proxy server
+     */
     url: string;
 }
 export enum SourceControlTypes {
@@ -16542,33 +18977,33 @@ export enum SourceControlTypes {
     Git = 2,
 }
 /**
-* The Team Context for an operation.
-*/
+ * The Team Context for an operation.
+ */
 export interface TeamContext {
     /**
-    * The team project Id or name.  Ignored if ProjectId is set.
-    */
+     * The team project Id or name.  Ignored if ProjectId is set.
+     */
     project: string;
     /**
-    * The Team Project ID.  Required if Project is not set.
-    */
+     * The Team Project ID.  Required if Project is not set.
+     */
     projectId: string;
     /**
-    * The Team Id or name.  Ignored if TeamId is set.
-    */
+     * The Team Id or name.  Ignored if TeamId is set.
+     */
     team: string;
     /**
-    * The Team Id
-    */
+     * The Team Id
+     */
     teamId: string;
 }
 /**
-* Represents a Team Project object.
-*/
+ * Represents a Team Project object.
+ */
 export interface TeamProject extends TeamProjectReference {
     /**
-    * The links to other objects related to this object.
-    */
+     * The links to other objects related to this object.
+     */
     _links: any;
     capabilities: {
         [key: string]: {
@@ -16576,119 +19011,119 @@ export interface TeamProject extends TeamProjectReference {
         };
     };
     /**
-    * The shallow ref to the default team.
-    */
+     * The shallow ref to the default team.
+     */
     defaultTeam: WebApiTeamRef;
 }
 /**
-* Data contract for a TeamProjectCollection.
-*/
+ * Data contract for a TeamProjectCollection.
+ */
 export interface TeamProjectCollection extends TeamProjectCollectionReference {
     /**
-    * The links to other objects related to this object.
-    */
+     * The links to other objects related to this object.
+     */
     _links: any;
     /**
-    * Project collection description.
-    */
+     * Project collection description.
+     */
     description: string;
     /**
-    * Project collection state.
-    */
+     * Project collection state.
+     */
     state: string;
 }
 /**
-* Reference object for a TeamProjectCollection.
-*/
+ * Reference object for a TeamProjectCollection.
+ */
 export interface TeamProjectCollectionReference {
     /**
-    * Collection Id.
-    */
+     * Collection Id.
+     */
     id: string;
     /**
-    * Collection Name.
-    */
+     * Collection Name.
+     */
     name: string;
     /**
-    * Collection REST Url.
-    */
+     * Collection REST Url.
+     */
     url: string;
 }
 /**
-* Represents a shallow reference to a TeamProject.
-*/
+ * Represents a shallow reference to a TeamProject.
+ */
 export interface TeamProjectReference {
     /**
-    * Project abbreviation.
-    */
+     * Project abbreviation.
+     */
     abbreviation: string;
     /**
-    * The project's description (if any).
-    */
+     * The project's description (if any).
+     */
     description: string;
     /**
-    * Project identifier.
-    */
+     * Project identifier.
+     */
     id: string;
     /**
-    * Project name.
-    */
+     * Project name.
+     */
     name: string;
     /**
-    * Project revision.
-    */
+     * Project revision.
+     */
     revision: number;
     /**
-    * Project state.
-    */
+     * Project state.
+     */
     state: any;
     /**
-    * Url to the full version of the object.
-    */
+     * Url to the full version of the object.
+     */
     url: string;
 }
 export interface WebApiConnectedService extends WebApiConnectedServiceRef {
     /**
-    * The user who did the OAuth authentication to created this service
-    */
+     * The user who did the OAuth authentication to created this service
+     */
     authenticatedBy: VSS_Common_Contracts.IdentityRef;
     /**
-    * Extra description on the service.
-    */
+     * Extra description on the service.
+     */
     description: string;
     /**
-    * Friendly Name of service connection
-    */
+     * Friendly Name of service connection
+     */
     friendlyName: string;
     /**
-    * Id/Name of the connection service. For Ex: Subscription Id for Azure Connection
-    */
+     * Id/Name of the connection service. For Ex: Subscription Id for Azure Connection
+     */
     id: string;
     /**
-    * The kind of service.
-    */
+     * The kind of service.
+     */
     kind: string;
     /**
-    * The project associated with this service
-    */
+     * The project associated with this service
+     */
     project: TeamProjectReference;
     /**
-    * Optional uri to connect directly to the service such as https://windows.azure.com
-    */
+     * Optional uri to connect directly to the service such as https://windows.azure.com
+     */
     serviceUri: string;
 }
 export interface WebApiConnectedServiceDetails extends WebApiConnectedServiceRef {
     /**
-    * Meta data for service connection
-    */
+     * Meta data for service connection
+     */
     connectedServiceMetaData: WebApiConnectedService;
     /**
-    * Credential info
-    */
+     * Credential info
+     */
     credentialsXml: string;
     /**
-    * Optional uri to connect directly to the service such as https://windows.azure.com
-    */
+     * Optional uri to connect directly to the service such as https://windows.azure.com
+     */
     endPoint: string;
 }
 export interface WebApiConnectedServiceRef {
@@ -16696,60 +19131,60 @@ export interface WebApiConnectedServiceRef {
     url: string;
 }
 /**
-* The representation of data needed to create a tag definition which is sent across the wire.
-*/
+ * The representation of data needed to create a tag definition which is sent across the wire.
+ */
 export interface WebApiCreateTagRequestData {
     name: string;
 }
 export interface WebApiProject extends TeamProjectReference {
     /**
-    * Set of capabilities this project has
-    */
+     * Set of capabilities this project has
+     */
     capabilities: {
         [key: string]: {
             [key: string]: string;
         };
     };
     /**
-    * Reference to collection which contains this project
-    */
+     * Reference to collection which contains this project
+     */
     collection: WebApiProjectCollectionRef;
     /**
-    * Default team for this project
-    */
+     * Default team for this project
+     */
     defaultTeam: WebApiTeamRef;
 }
 export interface WebApiProjectCollection extends WebApiProjectCollectionRef {
     /**
-    * Project collection description
-    */
+     * Project collection description
+     */
     description: string;
     /**
-    * Project collection state
-    */
+     * Project collection state
+     */
     state: string;
 }
 export interface WebApiProjectCollectionRef {
     /**
-    * Collection Tfs Url (Host Url)
-    */
+     * Collection Tfs Url (Host Url)
+     */
     collectionUrl: string;
     /**
-    * Collection Guid
-    */
+     * Collection Guid
+     */
     id: string;
     /**
-    * Collection Name
-    */
+     * Collection Name
+     */
     name: string;
     /**
-    * Collection REST Url
-    */
+     * Collection REST Url
+     */
     url: string;
 }
 /**
-* The representation of a tag definition which is sent across the wire.
-*/
+ * The representation of a tag definition which is sent across the wire.
+ */
 export interface WebApiTagDefinition {
     active: boolean;
     id: string;
@@ -16758,26 +19193,26 @@ export interface WebApiTagDefinition {
 }
 export interface WebApiTeam extends WebApiTeamRef {
     /**
-    * Team description
-    */
+     * Team description
+     */
     description: string;
     /**
-    * Identity REST API Url to this team
-    */
+     * Identity REST API Url to this team
+     */
     identityUrl: string;
 }
 export interface WebApiTeamRef {
     /**
-    * Team (Identity) Guid. A Team Foundation ID.
-    */
+     * Team (Identity) Guid. A Team Foundation ID.
+     */
     id: string;
     /**
-    * Team name
-    */
+     * Team name
+     */
     name: string;
     /**
-    * Team REST API Url
-    */
+     * Team REST API Url
+     */
     url: string;
 }
 export var TypeInfo: {
@@ -16790,6 +19225,12 @@ export var TypeInfo: {
         };
     };
     IdentityData: {
+        fields: any;
+    };
+    Process: {
+        fields: any;
+    };
+    ProcessReference: {
         fields: any;
     };
     ProjectChangeType: {
@@ -16873,47 +19314,63 @@ export class CoreHttpClient extends VSS_WebApi.VssHttpClient {
     static serviceInstanceId: string;
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {Contracts.WebApiConnectedServiceDetails} connectedServiceCreationData
      * @param {string} projectId
      * @return IPromise<Contracts.WebApiConnectedService>
      */
     createConnectedService(connectedServiceCreationData: Contracts.WebApiConnectedServiceDetails, projectId: string): IPromise<Contracts.WebApiConnectedService>;
     /**
+     * [Preview API]
+     *
      * @param {string} projectId
      * @param {string} name
      * @return IPromise<Contracts.WebApiConnectedServiceDetails>
      */
     getConnectedServiceDetails(projectId: string, name: string): IPromise<Contracts.WebApiConnectedServiceDetails>;
     /**
+     * [Preview API]
+     *
      * @param {string} projectId
      * @param {Contracts.ConnectedServiceKind} kind
      * @return IPromise<Contracts.WebApiConnectedService[]>
      */
     getConnectedServices(projectId: string, kind?: Contracts.ConnectedServiceKind): IPromise<Contracts.WebApiConnectedService[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.IdentityData} mruData
      * @param {string} mruName
      * @return IPromise<void>
      */
     createIdentityMru(mruData: Contracts.IdentityData, mruName: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.IdentityData} mruData
      * @param {string} mruName
      * @return IPromise<void>
      */
     deleteIdentityMru(mruData: Contracts.IdentityData, mruName: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} mruName
      * @return IPromise<VSS_Common_Contracts.IdentityRef[]>
      */
     getIdentityMru(mruName: string): IPromise<VSS_Common_Contracts.IdentityRef[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.IdentityData} mruData
      * @param {string} mruName
      * @return IPromise<void>
      */
     updateIdentityMru(mruData: Contracts.IdentityData, mruName: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} projectId
      * @param {string} teamId
      * @param {number} top
@@ -16922,14 +19379,14 @@ export class CoreHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTeamMembers(projectId: string, teamId: string, top?: number, skip?: number): IPromise<VSS_Common_Contracts.IdentityRef[]>;
     /**
-     * Get project collection with the specified id or name.
+     * [Preview API] Get project collection with the specified id or name.
      *
      * @param {string} collectionId
      * @return IPromise<Contracts.TeamProjectCollection>
      */
     getProjectCollection(collectionId: string): IPromise<Contracts.TeamProjectCollection>;
     /**
-     * Get project collection references for this application.
+     * [Preview API] Get project collection references for this application.
      *
      * @param {number} top
      * @param {number} skip
@@ -16937,12 +19394,14 @@ export class CoreHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getProjectCollections(top?: number, skip?: number): IPromise<Contracts.TeamProjectCollectionReference[]>;
     /**
+     * [Preview API]
+     *
      * @param {number} minRevision
      * @return IPromise<Contracts.TeamProjectReference[]>
      */
     getProjectHistory(minRevision?: number): IPromise<Contracts.TeamProjectReference[]>;
     /**
-     * Get project with the specified id or name, optionally including capabilities.
+     * [Preview API] Get project with the specified id or name, optionally including capabilities.
      *
      * @param {string} projectId
      * @param {boolean} includeCapabilities - Include capabilities (such as source control) in the team project result (default: false).
@@ -16951,7 +19410,7 @@ export class CoreHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getProject(projectId: string, includeCapabilities?: boolean, includeHistory?: boolean): IPromise<Contracts.TeamProject>;
     /**
-     * Get project references with the specified state
+     * [Preview API] Get project references with the specified state
      *
      * @param {any} stateFilter - Filter on team projects in a specific team project state (default: WellFormed).
      * @param {number} top
@@ -16960,21 +19419,21 @@ export class CoreHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getProjects(stateFilter?: any, top?: number, skip?: number): IPromise<Contracts.TeamProjectReference[]>;
     /**
-     * Queue a project creation.
+     * [Preview API] Queue a project creation.
      *
      * @param {Contracts.TeamProject} projectToCreate - The project to create.
      * @return IPromise<VSS_Operations_Contracts.OperationReference>
      */
     queueCreateProject(projectToCreate: Contracts.TeamProject): IPromise<VSS_Operations_Contracts.OperationReference>;
     /**
-     * Queue a project deletion.
+     * [Preview API] Queue a project deletion.
      *
      * @param {string} projectId - The project id of the project to delete.
      * @return IPromise<VSS_Operations_Contracts.OperationReference>
      */
     queueDeleteProject(projectId: string): IPromise<VSS_Operations_Contracts.OperationReference>;
     /**
-     * Update an existing project's name, abbreviation, or description.
+     * [Preview API] Update an existing project's name, abbreviation, or description.
      *
      * @param {Contracts.TeamProject} projectUpdate - The updates for the project.
      * @param {string} projectId - The project id of the project to update.
@@ -16982,11 +19441,15 @@ export class CoreHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateProject(projectUpdate: Contracts.TeamProject, projectId: string): IPromise<VSS_Operations_Contracts.OperationReference>;
     /**
+     * [Preview API]
+     *
      * @param {string} proxyUrl
      * @return IPromise<Contracts.Proxy[]>
      */
     getProxies(proxyUrl?: string): IPromise<Contracts.Proxy[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} projectId
      * @param {string} teamId
      * @param {number} top
@@ -16994,6 +19457,218 @@ export class CoreHttpClient extends VSS_WebApi.VssHttpClient {
      * @return IPromise<Contracts.WebApiTeam>
      */
     getTeams(projectId: string, teamId?: string, top?: number, skip?: number): IPromise<Contracts.WebApiTeam>;
+}
+}
+declare module "TFS/Discussion/Contracts" {
+import VSS_Common_Contracts = require("VSS/WebApi/Contracts");
+export interface ArtifactDiscussionThread extends DiscussionThread {
+}
+export enum CommentType {
+    Unknown = 0,
+    Text = 1,
+    CodeChange = 2,
+    System = 3,
+}
+export interface DiscussionComment {
+    author: VSS_Common_Contracts.IdentityRef;
+    canDelete: boolean;
+    content: string;
+    /**
+     * CommentId in a thread always starting from 1.
+     */
+    id: number;
+    isDeleted: boolean;
+    lastUpdatedDate: Date;
+    /**
+     * Used for comment replies. It must be a commentId of a comment in comment list of a thread.
+     */
+    parentId: number;
+    publishedDate: Date;
+    threadId: number;
+    usersLiked: VSS_Common_Contracts.IdentityRef[];
+}
+export interface DiscussionCommentCollection {
+}
+export enum DiscussionSeverity {
+    Unknown = 0,
+    Low = 1,
+    Normal = 2,
+    High = 3,
+}
+export enum DiscussionStatus {
+    Unknown = 0,
+    Active = 1,
+    Fixed = 2,
+    WontFix = 3,
+    Closed = 4,
+    ByDesign = 5,
+    Pending = 6,
+}
+export interface DiscussionThread {
+    artifactUri: string;
+    comments: DiscussionComment[];
+    commentsCount: number;
+    id: number;
+    lastUpdatedDate: Date;
+    properties: any;
+    publishedDate: Date;
+    status: DiscussionStatus;
+    workItemId: number;
+}
+export interface DiscussionThreadCollection {
+}
+export var TypeInfo: {
+    ArtifactDiscussionThread: {
+        fields: any;
+    };
+    CommentType: {
+        enumValues: {
+            "unknown": number;
+            "text": number;
+            "codeChange": number;
+            "system": number;
+        };
+    };
+    DiscussionComment: {
+        fields: any;
+    };
+    DiscussionCommentCollection: {
+        fields: any;
+    };
+    DiscussionSeverity: {
+        enumValues: {
+            "unknown": number;
+            "low": number;
+            "normal": number;
+            "high": number;
+        };
+    };
+    DiscussionStatus: {
+        enumValues: {
+            "unknown": number;
+            "active": number;
+            "fixed": number;
+            "wontFix": number;
+            "closed": number;
+            "byDesign": number;
+            "pending": number;
+        };
+    };
+    DiscussionThread: {
+        fields: any;
+    };
+    DiscussionThreadCollection: {
+        fields: any;
+    };
+};
+}
+declare module "TFS/Discussion/RestClient" {
+import Contracts = require("TFS/Discussion/Contracts");
+import VSS_Common_Contracts = require("VSS/WebApi/Contracts");
+import VSS_WebApi = require("VSS/WebApi/RestClient");
+export class DiscussionHttpClient extends VSS_WebApi.VssHttpClient {
+    static serviceInstanceId: string;
+    constructor(rootRequestPath: string);
+    /**
+     * [Preview API] Create a discussion comment POST /_apis/discussion/threads/{discussionId}/comments
+     *
+     * @param {Contracts.DiscussionComment} newComment
+     * @param {number} discussionId
+     * @return IPromise<Contracts.DiscussionComment>
+     */
+    addComment(newComment: Contracts.DiscussionComment, discussionId: number): IPromise<Contracts.DiscussionComment>;
+    /**
+     * [Preview API] Create multiple discussion comments for a discussion thread PATCH /_apis/discussion/threads/{discussionId}/comments
+     *
+     * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.DiscussionComment[]>} newComments
+     * @param {number} discussionId
+     * @return IPromise<Contracts.DiscussionComment[]>
+     */
+    addCommentsByDiscussionId(newComments: VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.DiscussionComment[]>, discussionId: number): IPromise<Contracts.DiscussionComment[]>;
+    /**
+     * [Preview API] Remove a discussion comment DELETE /_apis/discussion/threads/{discussionId}/comments/{commentId}
+     *
+     * @param {number} discussionId
+     * @param {number} commentId
+     * @return IPromise<void>
+     */
+    deleteComment(discussionId: number, commentId: number): IPromise<void>;
+    /**
+     * [Preview API] Read a comment by id GET /_apis/discussion/threads/{discussionId}/comments/{commentId}
+     *
+     * @param {number} discussionId
+     * @param {number} commentId
+     * @return IPromise<Contracts.DiscussionComment>
+     */
+    getComment(discussionId: number, commentId: number): IPromise<Contracts.DiscussionComment>;
+    /**
+     * [Preview API] Read all comments for a discussion thread GET /_apis/discussion/threads/{discussionId}/comments
+     *
+     * @param {number} discussionId
+     * @return IPromise<Contracts.DiscussionCommentCollection>
+     */
+    getComments(discussionId: number): IPromise<Contracts.DiscussionCommentCollection>;
+    /**
+     * [Preview API] Update a discussion comment PATCH /_apis/discussion/threads/{discussionId}/comments/{commentId}
+     *
+     * @param {Contracts.DiscussionComment} newComment
+     * @param {number} discussionId
+     * @param {number} commentId
+     * @return IPromise<Contracts.DiscussionComment>
+     */
+    updateComment(newComment: Contracts.DiscussionComment, discussionId: number, commentId: number): IPromise<Contracts.DiscussionComment>;
+    /**
+     * [Preview API] Create multiple comments across discussion threads PATCH /_apis/discussion/comments
+     *
+     * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.DiscussionComment[]>} newComments
+     * @return IPromise<Contracts.DiscussionComment[]>
+     */
+    addComments(newComments: VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.DiscussionComment[]>): IPromise<Contracts.DiscussionComment[]>;
+    /**
+     * [Preview API] Create a discussion thread POST /_apis/discussion/threads
+     *
+     * @param {Contracts.DiscussionThread} newThread
+     * @return IPromise<Contracts.DiscussionThread>
+     */
+    createThread(newThread: Contracts.DiscussionThread): IPromise<Contracts.DiscussionThread>;
+    /**
+     * [Preview API] Create multiple discussion threads PATCH /_apis/discussion/threads
+     *
+     * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.DiscussionThreadCollection>} newThreads
+     * @return IPromise<Contracts.DiscussionThreadCollection>
+     */
+    createThreads(newThreads: VSS_Common_Contracts.VssJsonCollectionWrapperV<Contracts.DiscussionThreadCollection>): IPromise<Contracts.DiscussionThreadCollection>;
+    /**
+     * [Preview API] Query discussion threads by work item id GET /_apis/discussion/threads?workItemId={workItemId}
+     *
+     * @param {number} workItemId
+     * @return IPromise<Contracts.DiscussionThreadCollection>
+     */
+    getThreadsByWorkItemId(workItemId: number): IPromise<Contracts.DiscussionThreadCollection>;
+    /**
+     * [Preview API] Read a discussion thread by id GET /_apis/discussion/threads/{discussionId}
+     *
+     * @param {number} discussionId
+     * @return IPromise<Contracts.DiscussionThread>
+     */
+    getThread(discussionId: number): IPromise<Contracts.DiscussionThread>;
+    /**
+     * [Preview API] Update a discussion thread PATCH /_apis/discussion/threads/{discussionId}
+     *
+     * @param {Contracts.DiscussionThread} newThread
+     * @param {number} discussionId
+     * @return IPromise<Contracts.DiscussionThread>
+     */
+    updateThread(newThread: Contracts.DiscussionThread, discussionId: number): IPromise<Contracts.DiscussionThread>;
+    /**
+     * [Preview API] Query discussion threads by artifact uri POST /_apis/discussion/threadsBatch
+     *
+     * @param {string[]} artifactUris
+     * @return IPromise<{ [key: string] : Contracts.DiscussionThread[]; }>
+     */
+    getThreads(artifactUris: string[]): IPromise<{
+        [key: string]: Contracts.DiscussionThread[];
+    }>;
 }
 }
 declare module "TFS/DistributedTask/Contracts" {
@@ -17008,21 +19683,25 @@ export interface AgentRefreshMessage {
 }
 export enum ConnectedServiceKind {
     /**
-    * Custom or unknown service
-    */
+     * Custom or unknown service
+     */
     Custom = 0,
     /**
-    * Azure Subscription
-    */
+     * Azure Subscription
+     */
     AzureSubscription = 1,
     /**
-    * Chef Connection
-    */
+     * Chef Connection
+     */
     Chef = 2,
     /**
-    * Generic Connection
-    */
+     * Generic Connection
+     */
     Generic = 3,
+    /**
+     * GitHub Connection
+     */
+    GitHub = 4,
 }
 export interface EndpointAuthorization {
     parameters: {
@@ -17053,8 +19732,8 @@ export interface JobCompletedEvent extends JobEvent {
     result: TaskResult;
 }
 /**
-* Represents the context of variables and vectors for a job request.
-*/
+ * Represents the context of variables and vectors for a job request.
+ */
 export interface JobEnvironment {
     endpoints: ServiceEndpoint[];
     mask: MaskHint[];
@@ -17062,8 +19741,8 @@ export interface JobEnvironment {
         [key: number]: JobOption;
     };
     /**
-    * Gets or sets the endpoint used for communicating back to the calling service.
-    */
+     * Gets or sets the endpoint used for communicating back to the calling service.
+     */
     systemConnection: ServiceEndpoint;
     variables: {
         [key: string]: string;
@@ -17074,25 +19753,23 @@ export interface JobEvent {
     name: string;
 }
 /**
-* Represents an option that may affect the way an agent runs the job.
-*/
+ * Represents an option that may affect the way an agent runs the job.
+ */
 export interface JobOption {
     data: {
         [key: string]: string;
     };
     /**
-    * Gets the id of the option.
-    */
+     * Gets the id of the option.
+     */
     id: string;
 }
 export interface JobRequestMessage {
-    endpoints: ServiceEndpoint[];
     environment: JobEnvironment;
     jobId: string;
     jobName: string;
     lockedUntil: Date;
     lockToken: string;
-    options: JobOption[];
     plan: TaskOrchestrationPlanReference;
     requestId: number;
     tasks: TaskInstance[];
@@ -17116,54 +19793,62 @@ export interface PlanEnvironment {
     };
 }
 /**
-* Represents an endpoint which may be used by an orchestration job.
-*/
+ * Represents an endpoint which may be used by an orchestration job.
+ */
 export interface ServiceEndpoint {
     /**
-    * Gets or sets the authorization data for talking to the endpoint.
-    */
+     * Gets or sets the authorization data for talking to the endpoint.
+     */
     authorization: EndpointAuthorization;
+    /**
+     * The Gets or sets Identity reference for the user who created the Service endpoint
+     */
+    createdBy: VSS_Common_Contracts.IdentityRef;
     data: {
         [key: string]: string;
     };
     /**
-    * Gets or sets the identifier of this endpoint.
-    */
+     * Gets or Sets description of endpoint
+     */
+    description: string;
+    /**
+     * Gets or sets the identifier of this endpoint.
+     */
     id: string;
     /**
-    * Gets or sets the friendly name of the endpoint.
-    */
+     * Gets or sets the friendly name of the endpoint.
+     */
     name: string;
     /**
-    * Gets or sets the type of the endpoint.
-    */
+     * Gets or sets the type of the endpoint.
+     */
     type: string;
     /**
-    * Gets or sets the url of the endpoint.
-    */
+     * Gets or sets the url of the endpoint.
+     */
     url: string;
 }
 export interface TaskAgent extends TaskAgentReference {
     /**
-    * Gets the date on which this agent was created.
-    */
+     * Gets the date on which this agent was created.
+     */
     createdOn: Date;
     /**
-    * Gets or sets a value indicating whether or not this agent should be enabled for job execution.
-    */
+     * Gets or sets a value indicating whether or not this agent should be enabled for job execution.
+     */
     enabled: boolean;
     /**
-    * Gets or sets the maximum job parallelism allowed on this host.
-    */
+     * Gets or sets the maximum job parallelism allowed on this host.
+     */
     maxParallelism: number;
     properties: any;
     /**
-    * Gets the current connectivity status of the agent.
-    */
+     * Gets the current connectivity status of the agent.
+     */
     status: TaskAgentStatus;
     /**
-    * Gets the date on which the last connectivity status change occurred.
-    */
+     * Gets the date on which the last connectivity status change occurred.
+     */
     statusChangedOn: Date;
     systemCapabilities: {
         [key: string]: string;
@@ -17196,37 +19881,37 @@ export interface TaskAgentMessage {
 }
 export interface TaskAgentPool extends TaskAgentPoolReference {
     /**
-    * Gets the administrators group for this agent pool.
-    */
+     * Gets the administrators group for this agent pool.
+     */
     administratorsGroup: VSS_Common_Contracts.IdentityRef;
     /**
-    * Gets or sets a value indicating whether or not a queue should be automatically provisioned for each project collection or not.
-    */
+     * Gets or sets a value indicating whether or not a queue should be automatically provisioned for each project collection or not.
+     */
     autoProvision: boolean;
     /**
-    * Gets the identity who created this pool. The creator of the pool is automatically added into the administrators group for the pool on creation.
-    */
+     * Gets the identity who created this pool. The creator of the pool is automatically added into the administrators group for the pool on creation.
+     */
     createdBy: VSS_Common_Contracts.IdentityRef;
     /**
-    * Gets the date/time of the pool creation.
-    */
+     * Gets the date/time of the pool creation.
+     */
     createdOn: Date;
     /**
-    * Gets the scope identifier for groups/roles which are owned by this pool.
-    */
+     * Gets the scope identifier for groups/roles which are owned by this pool.
+     */
     groupScopeId: string;
     /**
-    * Gets or sets a value indicating whether or not this pool is managed by the service.
-    */
+     * Gets or sets a value indicating whether or not this pool is managed by the service.
+     */
     isHosted: boolean;
     properties: any;
     /**
-    * Gets the service accounts group for this agent pool.
-    */
+     * Gets the service accounts group for this agent pool.
+     */
     serviceAccountsGroup: VSS_Common_Contracts.IdentityRef;
     /**
-    * Gets the current size of the pool.
-    */
+     * Gets the current size of the pool.
+     */
     size: number;
 }
 export interface TaskAgentPoolReference {
@@ -17236,16 +19921,16 @@ export interface TaskAgentPoolReference {
 }
 export interface TaskAgentReference {
     /**
-    * Gets the identifier of the agent.
-    */
+     * Gets the identifier of the agent.
+     */
     id: number;
     /**
-    * Gets the name of the agent.
-    */
+     * Gets the name of the agent.
+     */
     name: string;
     /**
-    * Gets the version of the agent.
-    */
+     * Gets the version of the agent.
+     */
     version: string;
 }
 export interface TaskAgentSession {
@@ -17269,6 +19954,7 @@ export interface TaskDefinition {
     description: string;
     friendlyName: string;
     groups: TaskGroupDefinition[];
+    helpMarkDown: string;
     hostType: string;
     iconUrl: string;
     id: string;
@@ -17286,34 +19972,34 @@ export interface TaskDefinition {
 }
 export interface TaskDefinitionEndpoint {
     /**
-    * An ID that identifies a service connection to be used for authenticating endpoint requests.
-    */
+     * An ID that identifies a service connection to be used for authenticating endpoint requests.
+     */
     connectionId: string;
     /**
-    * The scope as understood by Connected Services. Essentialy, a project-id for now.
-    */
+     * The scope as understood by Connected Services. Essentialy, a project-id for now.
+     */
     scope: string;
     /**
-    * An XPath/Json based selector to filter response returned by fetching the endpoint Url. An XPath based selector must be prefixed with the string &quot;xpath:&quot;. A Json based selector must be prefixed with &quot;json:&quot;.  The following selector defines an XPath for extracting nodes named 'ServiceName'.  endpoint.Selector = &quot;xpath://ServiceName&quot;;
-    */
+     * An XPath/Json based selector to filter response returned by fetching the endpoint Url. An XPath based selector must be prefixed with the string "xpath:". A Json based selector must be prefixed with "json:".  The following selector defines an XPath for extracting nodes named 'ServiceName'.  endpoint.Selector = "xpath://ServiceName";
+     */
     selector: string;
     /**
-    * TaskId that this endpoint belongs to.
-    */
+     * TaskId that this endpoint belongs to.
+     */
     taskId: string;
     /**
-    * URL to GET.
-    */
+     * URL to GET.
+     */
     url: string;
 }
 export interface TaskExecution {
     /**
-    * The utility task to run.  Specifying this means that this task definition is simply a meta task to call another task. This is useful for tasks that call utility tasks like powershell and commandline
-    */
+     * The utility task to run.  Specifying this means that this task definition is simply a meta task to call another task. This is useful for tasks that call utility tasks like powershell and commandline
+     */
     execTask: TaskReference;
     /**
-    * If a task is going to run code, then this provides the type/script etc... information by platform. For example, it might look like. net45: { typeName: &quot;Microsoft.TeamFoundation.Automation.Tasks.PowerShellTask&quot;, assemblyName: &quot;Microsoft.TeamFoundation.Automation.Tasks.PowerShell.dll&quot; } net20: { typeName: &quot;Microsoft.TeamFoundation.Automation.Tasks.PowerShellTask&quot;, assemblyName: &quot;Microsoft.TeamFoundation.Automation.Tasks.PowerShell.dll&quot; } java: { jar: &quot;powershelltask.tasks.automation.teamfoundation.microsoft.com&quot;, } node: { script: &quot;powershellhost.js&quot;, }
-    */
+     * If a task is going to run code, then this provides the type/script etc... information by platform. For example, it might look like. net45: { typeName: "Microsoft.TeamFoundation.Automation.Tasks.PowerShellTask", assemblyName: "Microsoft.TeamFoundation.Automation.Tasks.PowerShell.dll" } net20: { typeName: "Microsoft.TeamFoundation.Automation.Tasks.PowerShellTask", assemblyName: "Microsoft.TeamFoundation.Automation.Tasks.PowerShell.dll" } java: { jar: "powershelltask.tasks.automation.teamfoundation.microsoft.com", } node: { script: "powershellhost.js", }
+     */
     platformInstructions: {
         [key: string]: {
             [key: string]: string;
@@ -17408,16 +20094,16 @@ export enum TaskOrchestrationPlanState {
 }
 export interface TaskPackageMetadata {
     /**
-    * Gets the name of the package.
-    */
+     * Gets the name of the package.
+     */
     type: string;
     /**
-    * Gets the url of the package.
-    */
+     * Gets the url of the package.
+     */
     url: string;
     /**
-    * Gets the version of the package.
-    */
+     * Gets the version of the package.
+     */
     version: string;
 }
 export interface TaskReference {
@@ -17449,32 +20135,32 @@ export interface TaskVersion {
     patch: number;
 }
 /**
-* Represents a shallow reference to a TeamProject.
-*/
+ * Represents a shallow reference to a TeamProject.
+ */
 export interface TeamProjectReference {
     /**
-    * Project abbreviation.
-    */
+     * Project abbreviation.
+     */
     abbreviation: string;
     /**
-    * The project's description (if any).
-    */
+     * The project's description (if any).
+     */
     description: string;
     /**
-    * Project identifier.
-    */
+     * Project identifier.
+     */
     id: string;
     /**
-    * Project name.
-    */
+     * Project name.
+     */
     name: string;
     /**
-    * Project state.
-    */
+     * Project state.
+     */
     state: any;
     /**
-    * Url to the full version of the object.
-    */
+     * Url to the full version of the object.
+     */
     url: string;
 }
 export interface Timeline extends TimelineReference {
@@ -17517,46 +20203,46 @@ export interface TimelineReference {
 }
 export interface WebApiConnectedService extends WebApiConnectedServiceRef {
     /**
-    * The user who did the OAuth authentication to created this service
-    */
+     * The user who did the OAuth authentication to created this service
+     */
     authenticatedBy: VSS_Common_Contracts.IdentityRef;
     /**
-    * Extra description on the service.
-    */
+     * Extra description on the service.
+     */
     description: string;
     /**
-    * Friendly Name of service connection
-    */
+     * Friendly Name of service connection
+     */
     friendlyName: string;
     /**
-    * Id/Name of the connection service. For Ex: Subscription Id for Azure Connection
-    */
+     * Id/Name of the connection service. For Ex: Subscription Id for Azure Connection
+     */
     id: string;
     /**
-    * The kind of service.
-    */
+     * The kind of service.
+     */
     kind: string;
     /**
-    * The project associated with this service
-    */
+     * The project associated with this service
+     */
     project: TeamProjectReference;
     /**
-    * Optional uri to connect directly to the service such as https://windows.azure.com
-    */
+     * Optional uri to connect directly to the service such as https://windows.azure.com
+     */
     serviceUri: string;
 }
 export interface WebApiConnectedServiceDetails extends WebApiConnectedServiceRef {
     /**
-    * Meta data for service connection
-    */
+     * Meta data for service connection
+     */
     connectedServiceMetaData: WebApiConnectedService;
     /**
-    * Credential info
-    */
+     * Credential info
+     */
     credentialsXml: string;
     /**
-    * Optional uri to connect directly to the service such as https://windows.azure.com
-    */
+     * Optional uri to connect directly to the service such as https://windows.azure.com
+     */
     endPoint: string;
 }
 export interface WebApiConnectedServiceRef {
@@ -17576,6 +20262,7 @@ export var TypeInfo: {
             "azureSubscription": number;
             "chef": number;
             "generic": number;
+            "gitHub": number;
         };
     };
     EndpointAuthorization: {
@@ -17764,18 +20451,24 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgent} agent
      * @param {number} poolId
      * @return IPromise<Contracts.TaskAgent>
      */
     createAgent(agent: Contracts.TaskAgent, poolId: number): IPromise<Contracts.TaskAgent>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {number} agentId
      * @return IPromise<void>
      */
     deleteAgent(poolId: number, agentId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {number} agentId
      * @param {boolean} includeCapabilities
@@ -17784,6 +20477,8 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getAgent(poolId: number, agentId: number, includeCapabilities?: boolean, propertyFilters?: string): IPromise<Contracts.TaskAgent>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {string} agentName
      * @param {boolean} includeCapabilities
@@ -17793,6 +20488,8 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getAgents(poolId: number, agentName?: string, includeCapabilities?: boolean, propertyFilters?: string, demands?: string): IPromise<Contracts.TaskAgent[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgent} agent
      * @param {number} poolId
      * @param {number} agentId
@@ -17800,6 +20497,8 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     replaceAgent(agent: Contracts.TaskAgent, poolId: number, agentId: number): IPromise<Contracts.TaskAgent>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgent} agent
      * @param {number} poolId
      * @param {number} agentId
@@ -17807,13 +20506,15 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateAgent(agent: Contracts.TaskAgent, poolId: number, agentId: number): IPromise<Contracts.TaskAgent>;
     /**
-     * Proxy for a GET request defined by an 'endpoint'. The request is authorized using a service connection. The response is filtered using an XPath/Json based selector.
+     * [Preview API] Proxy for a GET request defined by an 'endpoint'. The request is authorized using a service connection. The response is filtered using an XPath/Json based selector.
      *
      * @param {Contracts.TaskDefinitionEndpoint} endpoint - Describes the URL to fetch.
      * @return IPromise<string[]>
      */
     queryEndpoint(endpoint: Contracts.TaskDefinitionEndpoint): IPromise<string[]>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {number} requestId
      * @param {string} lockToken
@@ -17821,18 +20522,24 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteRequest(poolId: number, requestId: number, lockToken: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {number} requestId
      * @return IPromise<Contracts.TaskAgentJobRequest>
      */
     getRequest(poolId: number, requestId: number): IPromise<Contracts.TaskAgentJobRequest>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgentJobRequest} request
      * @param {number} poolId
      * @return IPromise<Contracts.TaskAgentJobRequest>
      */
     queueRequest(request: Contracts.TaskAgentJobRequest, poolId: number): IPromise<Contracts.TaskAgentJobRequest>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgentJobRequest} request
      * @param {number} poolId
      * @param {number} requestId
@@ -17841,6 +20548,8 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateRequest(request: Contracts.TaskAgentJobRequest, poolId: number, requestId: number, lockToken: string): IPromise<Contracts.TaskAgentJobRequest>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {number} messageId
      * @param {string} sessionId
@@ -17848,6 +20557,8 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteMessage(poolId: number, messageId: number, sessionId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {string} sessionId
      * @param {number} lastMessageId
@@ -17855,17 +20566,23 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getMessage(poolId: number, sessionId: string, lastMessageId?: number): IPromise<Contracts.TaskAgentMessage>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {number} agentId
      * @return IPromise<void>
      */
     refreshAgent(poolId: number, agentId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @return IPromise<void>
      */
     refreshAgents(poolId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgentMessage} message
      * @param {number} poolId
      * @param {number} requestId
@@ -17873,62 +20590,140 @@ export class TaskAgentHttpClient extends VSS_WebApi.VssHttpClient {
      */
     sendMessage(message: Contracts.TaskAgentMessage, poolId: number, requestId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgentPool} pool
      * @return IPromise<Contracts.TaskAgentPool>
      */
     createPool(pool: Contracts.TaskAgentPool): IPromise<Contracts.TaskAgentPool>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @return IPromise<void>
      */
     deletePool(poolId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {string} properties
      * @return IPromise<Contracts.TaskAgentPool>
      */
     getPool(poolId: number, properties?: string): IPromise<Contracts.TaskAgentPool>;
     /**
+     * [Preview API]
+     *
      * @param {string} poolName
      * @param {string} properties
      * @return IPromise<Contracts.TaskAgentPool[]>
      */
     getPools(poolName?: string, properties?: string): IPromise<Contracts.TaskAgentPool[]>;
     /**
+     * [Preview API]
+     *
+     * @param {Contracts.TaskAgentPool} pool
+     * @param {number} poolId
+     * @return IPromise<Contracts.TaskAgentPool>
+     */
+    updatePool(pool: Contracts.TaskAgentPool, poolId: number): IPromise<Contracts.TaskAgentPool>;
+    /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @return IPromise<VSS_Common_Contracts.IdentityRef[]>
      */
     getAgentPoolRoles(poolId?: number): IPromise<VSS_Common_Contracts.IdentityRef[]>;
     /**
+     * [Preview API]
+     *
+     * @param {Contracts.ServiceEndpoint} endpoint
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} endpointId
+     * @return IPromise<Contracts.ServiceEndpoint>
+     */
+    createServiceEndpoint(endpoint: Contracts.ServiceEndpoint, scopeIdentifier: string, endpointId: string): IPromise<Contracts.ServiceEndpoint>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} endpointId
+     * @return IPromise<void>
+     */
+    deleteServiceEndpoint(scopeIdentifier: string, endpointId: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} endpointId
+     * @return IPromise<Contracts.ServiceEndpoint>
+     */
+    getServiceEndpointDetails(scopeIdentifier: string, endpointId: string): IPromise<Contracts.ServiceEndpoint>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} type
+     * @return IPromise<Contracts.ServiceEndpoint[]>
+     */
+    getServiceEndpoints(scopeIdentifier: string, type?: string): IPromise<Contracts.ServiceEndpoint[]>;
+    /**
+     * [Preview API]
+     *
      * @param {Contracts.TaskAgentSession} session
      * @param {number} poolId
      * @return IPromise<Contracts.TaskAgentSession>
      */
     createSession(session: Contracts.TaskAgentSession, poolId: number): IPromise<Contracts.TaskAgentSession>;
     /**
+     * [Preview API]
+     *
      * @param {number} poolId
      * @param {string} sessionId
      * @return IPromise<void>
      */
     deleteSession(poolId: number, sessionId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
+     * @param {string} taskId
+     * @return IPromise<void>
+     */
+    deleteTaskDefinition(taskId: string): IPromise<void>;
+    /**
+     * [Preview API]
+     *
      * @param {string} taskId
      * @param {string} versionString
      * @return IPromise<Contracts.TaskDefinition[]>
      */
     getTaskContent(taskId: string, versionString?: string): IPromise<Contracts.TaskDefinition[]>;
     /**
+     * [Preview API]
+     *
+     * @param {string} taskId
+     * @param {string} versionString
+     * @return IPromise<ArrayBuffer>
+     */
+    getTaskContentZip(taskId: string, versionString?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API]
+     *
      * @param {string[]} visibility
      * @return IPromise<Contracts.TaskDefinition[]>
      */
     getTaskDefinitions(visibility: string[]): IPromise<Contracts.TaskDefinition[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} taskId
      * @param {boolean} overwrite
      * @return IPromise<void>
      */
     uploadTaskDefinition(taskId: string, overwrite?: boolean): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {{ [key: string] : string; }} userCapabilities
      * @param {number} poolId
      * @param {number} agentId
@@ -17946,82 +20741,141 @@ import VSS_WebApi = require("VSS/WebApi/RestClient");
 export class TaskHttpClient extends VSS_WebApi.VssHttpClient {
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {TFS_DistributedTask_Contracts.JobEvent} eventData
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @return IPromise<void>
      */
-    postEvent(eventData: TFS_DistributedTask_Contracts.JobEvent, planId: string): IPromise<void>;
+    postEvent(eventData: TFS_DistributedTask_Contracts.JobEvent, scopeIdentifier: string, hubName: string, planId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<string[]>} lines
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @param {string} timelineId
      * @param {string} recordId
      * @return IPromise<void>
      */
-    postLines(lines: VSS_Common_Contracts.VssJsonCollectionWrapperV<string[]>, planId: string, timelineId: string, recordId: string): IPromise<void>;
+    postLines(lines: VSS_Common_Contracts.VssJsonCollectionWrapperV<string[]>, scopeIdentifier: string, hubName: string, planId: string, timelineId: string, recordId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
+     * @param {string} content
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
+     * @param {string} planId
+     * @param {number} logId
+     * @return IPromise<TFS_DistributedTask_Contracts.TaskLog>
+     */
+    appendLog(content: string, scopeIdentifier: string, hubName: string, planId: string, logId: number): IPromise<TFS_DistributedTask_Contracts.TaskLog>;
+    /**
+     * [Preview API]
+     *
      * @param {TFS_DistributedTask_Contracts.TaskLog} log
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @return IPromise<TFS_DistributedTask_Contracts.TaskLog>
      */
-    createLog(log: TFS_DistributedTask_Contracts.TaskLog, planId: string): IPromise<TFS_DistributedTask_Contracts.TaskLog>;
+    createLog(log: TFS_DistributedTask_Contracts.TaskLog, scopeIdentifier: string, hubName: string, planId: string): IPromise<TFS_DistributedTask_Contracts.TaskLog>;
     /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @param {number} logId
      * @param {number} startLine
      * @param {number} endLine
      * @return IPromise<string[]>
      */
-    getLog(planId: string, logId: number, startLine?: number, endLine?: number): IPromise<string[]>;
+    getLog(scopeIdentifier: string, hubName: string, planId: string, logId: number, startLine?: number, endLine?: number): IPromise<string[]>;
     /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @return IPromise<TFS_DistributedTask_Contracts.TaskLog[]>
      */
-    getLogs(planId: string): IPromise<TFS_DistributedTask_Contracts.TaskLog[]>;
+    getLogs(scopeIdentifier: string, hubName: string, planId: string): IPromise<TFS_DistributedTask_Contracts.TaskLog[]>;
     /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @return IPromise<TFS_DistributedTask_Contracts.TaskOrchestrationPlan>
      */
-    getPlan(planId: string): IPromise<TFS_DistributedTask_Contracts.TaskOrchestrationPlan>;
+    getPlan(scopeIdentifier: string, hubName: string, planId: string): IPromise<TFS_DistributedTask_Contracts.TaskOrchestrationPlan>;
     /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @param {string} timelineId
      * @param {number} changeId
      * @return IPromise<TFS_DistributedTask_Contracts.TimelineRecord[]>
      */
-    getRecords(planId: string, timelineId: string, changeId?: number): IPromise<TFS_DistributedTask_Contracts.TimelineRecord[]>;
+    getRecords(scopeIdentifier: string, hubName: string, planId: string, timelineId: string, changeId?: number): IPromise<TFS_DistributedTask_Contracts.TimelineRecord[]>;
     /**
+     * [Preview API]
+     *
      * @param {VSS_Common_Contracts.VssJsonCollectionWrapperV<TFS_DistributedTask_Contracts.TimelineRecord[]>} records
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @param {string} timelineId
      * @return IPromise<TFS_DistributedTask_Contracts.TimelineRecord[]>
      */
-    updateRecords(records: VSS_Common_Contracts.VssJsonCollectionWrapperV<TFS_DistributedTask_Contracts.TimelineRecord[]>, planId: string, timelineId: string): IPromise<TFS_DistributedTask_Contracts.TimelineRecord[]>;
+    updateRecords(records: VSS_Common_Contracts.VssJsonCollectionWrapperV<TFS_DistributedTask_Contracts.TimelineRecord[]>, scopeIdentifier: string, hubName: string, planId: string, timelineId: string): IPromise<TFS_DistributedTask_Contracts.TimelineRecord[]>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_DistributedTask_Contracts.Timeline} timeline
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @return IPromise<TFS_DistributedTask_Contracts.Timeline>
      */
-    createTimeline(timeline: TFS_DistributedTask_Contracts.Timeline, planId: string): IPromise<TFS_DistributedTask_Contracts.Timeline>;
+    createTimeline(timeline: TFS_DistributedTask_Contracts.Timeline, scopeIdentifier: string, hubName: string, planId: string): IPromise<TFS_DistributedTask_Contracts.Timeline>;
     /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @param {string} timelineId
      * @return IPromise<void>
      */
-    deleteTimeline(planId: string, timelineId: string): IPromise<void>;
+    deleteTimeline(scopeIdentifier: string, hubName: string, planId: string, timelineId: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @param {string} timelineId
      * @param {number} changeId
      * @param {boolean} includeRecords
      * @return IPromise<TFS_DistributedTask_Contracts.Timeline>
      */
-    getTimeline(planId: string, timelineId: string, changeId?: number, includeRecords?: boolean): IPromise<TFS_DistributedTask_Contracts.Timeline>;
+    getTimeline(scopeIdentifier: string, hubName: string, planId: string, timelineId: string, changeId?: number, includeRecords?: boolean): IPromise<TFS_DistributedTask_Contracts.Timeline>;
     /**
+     * [Preview API]
+     *
+     * @param {string} scopeIdentifier - The project GUID to scope the request
+     * @param {string} hubName - The name of the server hub: "build" for the Build server or "rm" for the Release Management server
      * @param {string} planId
      * @return IPromise<TFS_DistributedTask_Contracts.Timeline[]>
      */
-    getTimelines(planId: string): IPromise<TFS_DistributedTask_Contracts.Timeline[]>;
+    getTimelines(scopeIdentifier: string, hubName: string, planId: string): IPromise<TFS_DistributedTask_Contracts.Timeline[]>;
 }
 }
 declare module "TFS/TestManagement/Contracts" {
@@ -18052,6 +20906,7 @@ export interface BuildConfiguration {
     uri: string;
 }
 export interface BuildCoverage {
+    codeCoverageFileUrl: string;
     configuration: BuildConfiguration;
     lastError: string;
     modules: ModuleCoverage[];
@@ -18059,16 +20914,16 @@ export interface BuildCoverage {
 }
 export enum CoverageQueryFlags {
     /**
-    * If set, the Coverage.Modules property will be populated.
-    */
+     * If set, the Coverage.Modules property will be populated.
+     */
     Modules = 1,
     /**
-    * If set, the ModuleCoverage.Functions properties will be populated.
-    */
+     * If set, the ModuleCoverage.Functions properties will be populated.
+     */
     Functions = 2,
     /**
-    * If set, the ModuleCoverage.CoverageData field will be populated.
-    */
+     * If set, the ModuleCoverage.CoverageData field will be populated.
+     */
     BlockData = 4,
 }
 export interface CoverageStatistics {
@@ -18079,8 +20934,8 @@ export interface CoverageStatistics {
     linesPartiallyCovered: number;
 }
 /**
-* This is a temporary class to provide the details for the test run environment.
-*/
+ * This is a temporary class to provide the details for the test run environment.
+ */
 export interface DtlEnvironmentDetails {
     csmContent: string;
     csmParameters: string;
@@ -18165,6 +21020,7 @@ export interface RunCreateModel {
     completeDate: string;
     configurationIds: number[];
     controller: string;
+    dtlAutEnvironment: ShallowReference;
     dtlTestEnvironment: ShallowReference;
     dueDate: string;
     environmentDetails: DtlEnvironmentDetails;
@@ -18180,21 +21036,22 @@ export interface RunCreateModel {
     runTimeout: any;
     startDate: string;
     state: string;
+    testConfigurationsMapping: string;
     testEnvironmentId: string;
     testSettings: ShallowReference;
     type: string;
 }
 /**
-* This class is used to provide the filters used for discovery
-*/
+ * This class is used to provide the filters used for discovery
+ */
 export interface RunFilter {
     /**
-    * filter for the test case sources (test containers)
-    */
+     * filter for the test case sources (test containers)
+     */
     sourceFilter: string;
     /**
-    * filter for the test cases
-    */
+     * filter for the test cases
+     */
     testCaseFilter: string;
 }
 export interface RunStatistic {
@@ -18209,6 +21066,7 @@ export interface RunUpdateModel {
     completedDate: string;
     controller: string;
     deleteInProgressResults: boolean;
+    dtlAutEnvironment: ShallowReference;
     dtlEnvironment: ShallowReference;
     dtlEnvironmentDetails: DtlEnvironmentDetails;
     dueDate: string;
@@ -18223,20 +21081,20 @@ export interface RunUpdateModel {
     testSettings: ShallowReference;
 }
 /**
-* An abstracted reference to some other resource. This class is used to provide the build data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
-*/
+ * An abstracted reference to some other resource. This class is used to provide the build data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
+ */
 export interface ShallowReference {
     /**
-    * Id of the resource
-    */
+     * Id of the resource
+     */
     id: string;
     /**
-    * Name of the linked resource (definition name, controller name, etc.)
-    */
+     * Name of the linked resource (definition name, controller name, etc.)
+     */
     name: string;
     /**
-    * Full http link to the resource
-    */
+     * Full http link to the resource
+     */
     url: string;
 }
 export interface SharedStepModel {
@@ -18269,8 +21127,13 @@ export interface TestAttachmentRequestModel {
 }
 export interface TestCaseResult {
     afnStripId: number;
+    area: ShallowReference;
     associatedBugs: ShallowReference[];
+    automatedTestId: string;
     automatedTestName: string;
+    automatedTestStorage: string;
+    automatedTestType: string;
+    automatedTestTypeId: string;
     build: ShallowReference;
     comment: string;
     completedDate: Date;
@@ -18289,12 +21152,14 @@ export interface TestCaseResult {
     priority: number;
     project: ShallowReference;
     resetCount: number;
+    resolutionState: string;
     resolutionStateId: number;
     revision: number;
     runBy: VSS_Common_Contracts.IdentityRef;
     startedDate: Date;
     state: string;
     testCase: ShallowReference;
+    testCaseTitle: string;
     testPoint: ShallowReference;
     testRun: ShallowReference;
     url: string;
@@ -18367,20 +21232,20 @@ export interface TestIterationDetailsModel {
     url: string;
 }
 /**
-* An abstracted reference to some other resource. This class is used to provide the build data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
-*/
+ * An abstracted reference to some other resource. This class is used to provide the build data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
+ */
 export interface TestMessageLogDetails {
     /**
-    * Date when the resource is created
-    */
+     * Date when the resource is created
+     */
     dateCreated: Date;
     /**
-    * Id of the resource
-    */
+     * Id of the resource
+     */
     entryId: number;
     /**
-    * Message of the resource
-    */
+     * Message of the resource
+     */
     message: string;
 }
 export interface TestPlan {
@@ -18450,20 +21315,17 @@ export interface TestResultCreateModel {
     completedDate: string;
     computerName: string;
     configuration: ShallowReference;
-    dataRowCount: number;
     durationInMs: string;
     errorMessage: string;
     failureType: string;
     outcome: string;
     owner: VSS_Common_Contracts.IdentityRef;
     resolutionState: string;
-    revision: number;
     runBy: VSS_Common_Contracts.IdentityRef;
     startedDate: string;
     state: string;
     testCase: ShallowReference;
     testCasePriority: string;
-    testCaseRevision: number;
     testCaseTitle: string;
     testPoint: ShallowReference;
 }
@@ -18490,6 +21352,7 @@ export interface TestRun {
     controller: string;
     createdDate: Date;
     dropLocation: string;
+    dtlAutEnvironment: ShallowReference;
     dtlEnvironment: ShallowReference;
     dtlEnvironmentCreationDetails: DtlEnvironmentDetails;
     dueDate: Date;
@@ -18532,32 +21395,32 @@ export interface TestRunCoverage {
 }
 export enum TestRunState {
     /**
-    * Only used during an update to preserve the existing value.
-    */
+     * Only used during an update to preserve the existing value.
+     */
     Unspecified = 0,
     /**
-    * The run is still being created.  No tests have started yet.
-    */
+     * The run is still being created.  No tests have started yet.
+     */
     NotStarted = 1,
     /**
-    * Tests are running.
-    */
+     * Tests are running.
+     */
     InProgress = 2,
     /**
-    * All tests have completed or been skipped.
-    */
+     * All tests have completed or been skipped.
+     */
     Completed = 3,
     /**
-    * Run is stopped and remaing tests have been aborted
-    */
+     * Run is stopped and remaing tests have been aborted
+     */
     Aborted = 4,
     /**
-    * Run is currently initializing This is a legacy state and should not be used any more
-    */
+     * Run is currently initializing This is a legacy state and should not be used any more
+     */
     Waiting = 5,
     /**
-    * Run requires investigation because of a test point failure This is a legacy state and should not be used any more
-    */
+     * Run requires investigation because of a test point failure This is a legacy state and should not be used any more
+     */
     NeedsInvestigation = 6,
 }
 export interface TestRunStatistic {
@@ -18576,36 +21439,36 @@ export enum TestRunSubstate {
     CancellationInProgress = 8,
 }
 /**
-* Represents the test settings of the run. Used to create test settings and fetch test settings
-*/
+ * Represents the test settings of the run. Used to create test settings and fetch test settings
+ */
 export interface TestSettings {
     /**
-    * Area path required to create test settings
-    */
+     * Area path required to create test settings
+     */
     areaPath: string;
     /**
-    * Description of the test settings. Used in create test settings.
-    */
+     * Description of the test settings. Used in create test settings.
+     */
     description: string;
     /**
-    * Indicates if the tests settings is public or private.Used in create test settings.
-    */
+     * Indicates if the tests settings is public or private.Used in create test settings.
+     */
     isPublic: boolean;
     /**
-    * Xml string of machine roles. Used in create test settings.
-    */
+     * Xml string of machine roles. Used in create test settings.
+     */
     machineRoles: string;
     /**
-    * Test settings content.
-    */
+     * Test settings content.
+     */
     testSettingsContent: string;
     /**
-    * Test settings id.
-    */
+     * Test settings id.
+     */
     testSettingsId: number;
     /**
-    * Test settings name.
-    */
+     * Test settings name.
+     */
     testSettingsName: string;
 }
 export interface TestSuite {
@@ -18843,6 +21706,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
     static serviceInstanceId: string;
     constructor(rootRequestPath: string);
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TestAttachmentRequestModel} attachmentRequestModel
      * @param {string} project - Project ID or project name
      * @param {number} runId
@@ -18851,6 +21716,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createTestResultAttachment(attachmentRequestModel: Contracts.TestAttachmentRequestModel, project: string, runId: number, testCaseResultId: number): IPromise<Contracts.TestAttachmentReference>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TestAttachmentRequestModel} attachmentRequestModel
      * @param {string} project - Project ID or project name
      * @param {number} runId
@@ -18858,6 +21725,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createTestRunAttachment(attachmentRequestModel: Contracts.TestAttachmentRequestModel, project: string, runId: number): IPromise<Contracts.TestAttachmentReference>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} buildId
      * @param {number} flags
@@ -18865,6 +21734,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBuildCodeCoverage(project: string, buildId: number, flags: number): IPromise<Contracts.BuildCoverage[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @param {number} flags
@@ -18872,24 +21743,32 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestRunCodeCoverage(project: string, runId: number, flags: number): IPromise<Contracts.TestRunCoverage[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @return IPromise<Contracts.TestMessageLogDetails[]>
      */
     getTestRunLogs(project: string, runId: number): IPromise<Contracts.TestMessageLogDetails[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.PlanUpdateModel} testPlan
      * @param {string} project - Project ID or project name
      * @return IPromise<Contracts.TestPlan>
      */
     createTestPlan(testPlan: Contracts.PlanUpdateModel, project: string): IPromise<Contracts.TestPlan>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @return IPromise<Contracts.TestPlan>
      */
     getPlanById(project: string, planId: number): IPromise<Contracts.TestPlan>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {string} owner
      * @param {number} skip
@@ -18900,6 +21779,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPlans(project: string, owner?: string, skip?: number, top?: number, includePlanDetails?: boolean, filterActivePlans?: boolean): IPromise<Contracts.TestPlan[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.PlanUpdateModel} planUpdateModel
      * @param {string} project - Project ID or project name
      * @param {number} planId
@@ -18907,6 +21788,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateTestPlan(planUpdateModel: Contracts.PlanUpdateModel, project: string, planId: number): IPromise<Contracts.TestPlan>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -18916,6 +21799,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPoint(project: string, planId: number, suiteId: number, pointIds: number, witFields?: string): IPromise<Contracts.TestPoint>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -18930,6 +21815,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPoints(project: string, planId: number, suiteId: number, witFields?: string, configurationId?: string, testCaseId?: string, testPointIds?: string, includePointDetails?: boolean, skip?: number, top?: number): IPromise<Contracts.TestPoint[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.PointUpdateModel} pointUpdateModel
      * @param {string} project - Project ID or project name
      * @param {number} planId
@@ -18939,6 +21826,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateTestPoints(pointUpdateModel: Contracts.PointUpdateModel, project: string, planId: number, suiteId: number, pointIds: string): IPromise<Contracts.TestPoint[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @param {number} testCaseResultId
@@ -18948,6 +21837,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestIteration(project: string, runId: number, testCaseResultId: number, iterationId: number, includeActionResults?: boolean): IPromise<Contracts.TestIterationDetailsModel>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @param {number} testCaseResultId
@@ -18956,6 +21847,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestIterations(project: string, runId: number, testCaseResultId: number, includeActionResults?: boolean): IPromise<Contracts.TestIterationDetailsModel[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TestResultCreateModel[]} resultCreateModels
      * @param {string} project - Project ID or project name
      * @param {number} runId
@@ -18963,6 +21856,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     addTestResultsToTestRun(resultCreateModels: Contracts.TestResultCreateModel[], project: string, runId: number): IPromise<Contracts.TestCaseResult[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TestCaseResultUpdateModel} resultUpdateModel
      * @param {string} project - Project ID or project name
      * @param {number} runId
@@ -18971,6 +21866,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     bulkUpdateTestResults(resultUpdateModel: Contracts.TestCaseResultUpdateModel, project: string, runId: number, resultIds: number[]): IPromise<Contracts.TestCaseResult[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @param {number} testCaseResultId
@@ -18979,6 +21876,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestCaseResultById(project: string, runId: number, testCaseResultId: number, includeIterationDetails?: boolean): IPromise<Contracts.TestCaseResult>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @param {boolean} includeIterationDetails
@@ -18986,6 +21885,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestCaseResults(project: string, runId: number, includeIterationDetails?: boolean): IPromise<Contracts.TestCaseResult[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TestCaseResultUpdateModel[]} resultUpdateModels
      * @param {string} project - Project ID or project name
      * @param {number} runId
@@ -18993,6 +21894,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateTestResults(resultUpdateModels: Contracts.TestCaseResultUpdateModel[], project: string, runId: number): IPromise<Contracts.TestCaseResult[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @param {number} testCaseResultId
@@ -19002,14 +21905,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getActionResults(project: string, runId: number, testCaseResultId: number, iterationId: number, actionPath?: string): IPromise<Contracts.TestActionResultModel[]>;
     /**
-     * @param {string} project - Project ID or project name
-     * @param {number} runId
-     * @param {number} testCaseResultId
-     * @param {number} iterationId
-     * @return IPromise<Contracts.TestCaseResultAttachmentModel[]>
-     */
-    getTestResultAttachments(project: string, runId: number, testCaseResultId: number, iterationId: number): IPromise<Contracts.TestCaseResultAttachmentModel[]>;
-    /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @param {number} testCaseResultId
@@ -19019,6 +21916,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getResultParameters(project: string, runId: number, testCaseResultId: number, iterationId: number, paramName?: string): IPromise<Contracts.TestResultParameterModel[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.QueryModel} query
      * @param {string} project - Project ID or project name
      * @param {boolean} includeResultDetails
@@ -19029,20 +21928,16 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestResultsByQuery(query: Contracts.QueryModel, project: string, includeResultDetails?: boolean, includeIterationDetails?: boolean, skip?: number, top?: number): IPromise<Contracts.TestCaseResult[]>;
     /**
-     * @param {string} project - Project ID or project name
-     * @param {number} runId
-     * @param {string} buildUri
-     * @param {number} flags
-     * @return IPromise<Contracts.BuildCoverage[]>
-     */
-    getBuildCoverage(project: string, runId: number, buildUri: string, flags: number): IPromise<Contracts.BuildCoverage[]>;
-    /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @return IPromise<Contracts.TestRunStatistic>
      */
     getTestRunStatistics(project: string, runId: number): IPromise<Contracts.TestRunStatistic>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.QueryModel} query
      * @param {string} project - Project ID or project name
      * @param {boolean} includeRunDetails
@@ -19052,24 +21947,32 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestRunsByQuery(query: Contracts.QueryModel, project: string, includeRunDetails?: boolean, skip?: number, top?: number): IPromise<Contracts.TestRun[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.RunCreateModel} testRun
      * @param {string} project - Project ID or project name
      * @return IPromise<Contracts.TestRun>
      */
     createTestRun(testRun: Contracts.RunCreateModel, project: string): IPromise<Contracts.TestRun>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @return IPromise<void>
      */
     deleteTestRun(project: string, runId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} runId
      * @return IPromise<Contracts.TestRun>
      */
     getTestRunById(project: string, runId: number): IPromise<Contracts.TestRun>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {string} buildUri
      * @param {string} owner
@@ -19083,6 +21986,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestRuns(project: string, buildUri?: string, owner?: string, tmiRunId?: string, planId?: number, includeRunDetails?: boolean, automated?: boolean, skip?: number, top?: number): IPromise<Contracts.TestRun[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.RunUpdateModel} runUpdateModel
      * @param {string} project - Project ID or project name
      * @param {number} runId
@@ -19090,6 +21995,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateTestRun(runUpdateModel: Contracts.RunUpdateModel, project: string, runId: number): IPromise<Contracts.TestRun>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -19098,6 +22005,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     addTestCasesToSuite(project: string, planId: number, suiteId: number, testCaseIds: string): IPromise<Contracts.SuiteTestCase[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -19106,6 +22015,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestCaseById(project: string, planId: number, suiteId: number, testCaseIds: number): IPromise<Contracts.SuiteTestCase>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -19113,6 +22024,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestCases(project: string, planId: number, suiteId: number): IPromise<Contracts.SuiteTestCase[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -19121,6 +22034,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     removeTestCasesFromSuiteUrl(project: string, planId: number, suiteId: number, testCaseIds: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.SuiteCreateModel} testSuite
      * @param {string} project - Project ID or project name
      * @param {number} planId
@@ -19129,6 +22044,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createTestSuite(testSuite: Contracts.SuiteCreateModel, project: string, planId: number, suiteId: number): IPromise<Contracts.TestSuite[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -19136,6 +22053,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteTestSuite(project: string, planId: number, suiteId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {number} suiteId
@@ -19144,6 +22063,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestSuiteById(project: string, planId: number, suiteId: number, includeChildSuites?: boolean): IPromise<Contracts.TestSuite>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} planId
      * @param {boolean} includeSuites
@@ -19153,6 +22074,8 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getTestSuitesForPlan(project: string, planId: number, includeSuites?: boolean, skip?: number, top?: number): IPromise<Contracts.TestSuite[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.SuiteUpdateModel} suiteUpdateModel
      * @param {string} project - Project ID or project name
      * @param {number} planId
@@ -19161,23 +22084,31 @@ export class TestHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateTestSuite(suiteUpdateModel: Contracts.SuiteUpdateModel, project: string, planId: number, suiteId: number): IPromise<Contracts.TestSuite>;
     /**
+     * [Preview API]
+     *
      * @param {number} testCaseId
      * @return IPromise<Contracts.TestSuite[]>
      */
     getSuitesByTestCaseId(testCaseId: number): IPromise<Contracts.TestSuite[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TestSettings} testSettings
      * @param {string} project - Project ID or project name
      * @return IPromise<number>
      */
     createTestSettings(testSettings: Contracts.TestSettings, project: string): IPromise<number>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} testSettingsId
      * @return IPromise<void>
      */
     deleteTestSettings(project: string, testSettingsId: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} testSettingsId
      * @return IPromise<Contracts.TestSettings>
@@ -19194,8 +22125,8 @@ export interface AssociatedWorkItem {
     state: string;
     title: string;
     /**
-    * REST url
-    */
+     * REST url
+     */
     url: string;
     webUrl: string;
     workItemType: string;
@@ -19226,56 +22157,56 @@ export interface ChangeList<T> {
     version: string;
 }
 /**
-* Criteria used in a search for change lists
-*/
+ * Criteria used in a search for change lists
+ */
 export interface ChangeListSearchCriteria {
     /**
-    * If provided, a version descriptor to compare against base
-    */
+     * If provided, a version descriptor to compare against base
+     */
     compareVersion: string;
     /**
-    * If true, don't include delete history entries
-    */
+     * If true, don't include delete history entries
+     */
     excludeDeletes: boolean;
     /**
-    * Whether or not to follow renames for the given item being queried
-    */
+     * Whether or not to follow renames for the given item being queried
+     */
     followRenames: boolean;
     /**
-    * If provided, only include history entries created after this date (string)
-    */
+     * If provided, only include history entries created after this date (string)
+     */
     fromDate: string;
     /**
-    * If provided, a version descriptor for the earliest change list to include
-    */
+     * If provided, a version descriptor for the earliest change list to include
+     */
     fromVersion: string;
     /**
-    * Path of item to search under
-    */
+     * Path of item to search under
+     */
     itemPath: string;
     /**
-    * Version of the items to search
-    */
+     * Version of the items to search
+     */
     itemVersion: string;
     /**
-    * Number of results to skip (used when clicking more...)
-    */
+     * Number of results to skip (used when clicking more...)
+     */
     skip: number;
     /**
-    * If provided, only include history entries created before this date (string)
-    */
+     * If provided, only include history entries created before this date (string)
+     */
     toDate: string;
     /**
-    * If provided, the maximum number of history entries to return
-    */
+     * If provided, the maximum number of history entries to return
+     */
     top: number;
     /**
-    * If provided, a version descriptor for the latest change list to include
-    */
+     * If provided, a version descriptor for the latest change list to include
+     */
     toVersion: string;
     /**
-    * Alias or display name of user who made the changes
-    */
+     * Alias or display name of user who made the changes
+     */
     user: string;
 }
 export interface CheckinNote {
@@ -19293,27 +22224,27 @@ export interface FileContentMetadata {
 }
 export interface GitBaseVersionDescriptor extends GitVersionDescriptor {
     /**
-    * Version string identifier (name of tag/branch, SHA1 of commit)
-    */
+     * Version string identifier (name of tag/branch, SHA1 of commit)
+     */
     baseVersion: string;
     /**
-    * Version options - Specify additional modifiers to version (e.g Previous)
-    */
+     * Version options - Specify additional modifiers to version (e.g Previous)
+     */
     baseVersionOptions: GitVersionOptions;
     /**
-    * Version type (branch, tag, or commit). Determines how Id is interpreted
-    */
+     * Version type (branch, tag, or commit). Determines how Id is interpreted
+     */
     baseVersionType: GitVersionType;
 }
 export interface GitBlobRef {
     _links: any;
     /**
-    * SHA1 hash of git object
-    */
+     * SHA1 hash of git object
+     */
     objectId: string;
     /**
-    * Size of blob content (in bytes)
-    */
+     * Size of blob content (in bytes)
+     */
     size: number;
     url: string;
 }
@@ -19364,93 +22295,93 @@ export interface GitCommitToCreate {
 }
 export interface GitHistoryQueryResults extends HistoryQueryResults<GitItem> {
     /**
-    * Seed commit used for querying history.  Used for skip feature.
-    */
+     * Seed commit used for querying history.  Used for skip feature.
+     */
     startingCommitId: string;
     unpopulatedCount: number;
     unprocessedCount: number;
 }
 export interface GitItem extends ItemModel {
     /**
-    * SHA1 of commit item was fetched at
-    */
+     * SHA1 of commit item was fetched at
+     */
     commitId: string;
     /**
-    * Type of object (Commit, Tree, Blob, Tag, ...)
-    */
+     * Type of object (Commit, Tree, Blob, Tag, ...)
+     */
     gitObjectType: GitObjectType;
     /**
-    * Shallow ref to commit that last changed this item Only populated if latestProcessedChange is requested May not be accurate if latest change is not yet cached
-    */
+     * Shallow ref to commit that last changed this item Only populated if latestProcessedChange is requested May not be accurate if latest change is not yet cached
+     */
     latestProcessedChange: GitCommitRef;
     /**
-    * Git object id
-    */
+     * Git object id
+     */
     objectId: string;
 }
 export interface GitItemDescriptor {
     /**
-    * Path to item
-    */
+     * Path to item
+     */
     path: string;
     /**
-    * Specifies whether to include children (OneLevel), all descendants (Full), or None
-    */
+     * Specifies whether to include children (OneLevel), all descendants (Full), or None
+     */
     recursionLevel: VersionControlRecursionType;
     /**
-    * Version string (interpretation based on VersionType defined in subclass
-    */
+     * Version string (interpretation based on VersionType defined in subclass
+     */
     version: string;
     /**
-    * Version modifiers (e.g. previous)
-    */
+     * Version modifiers (e.g. previous)
+     */
     versionOptions: GitVersionOptions;
     /**
-    * How to interpret version (branch,tag,commit)
-    */
+     * How to interpret version (branch,tag,commit)
+     */
     versionType: GitVersionType;
 }
 export interface GitItemRequestData {
     /**
-    * Whether to include metadata for all items
-    */
+     * Whether to include metadata for all items
+     */
     includeContentMetadata: boolean;
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     /**
-    * Collection of items to fetch, including path, version, and recursion level
-    */
+     * Collection of items to fetch, including path, version, and recursion level
+     */
     itemDescriptors: GitItemDescriptor[];
     /**
-    * Whether to include shallow ref to commit that last changed each item
-    */
+     * Whether to include shallow ref to commit that last changed each item
+     */
     latestProcessedChange: boolean;
 }
 /**
-* Encapsulates the reference metadata of a Git media object.
-*/
+ * Encapsulates the reference metadata of a Git media object.
+ */
 export interface GitMediaObjectRef {
     /**
-    * Gets or sets the reference links of the Git media object.
-    */
+     * Gets or sets the reference links of the Git media object.
+     */
     _links: any;
     /**
-    * Gets or sets the Git media object identifier. This Id property duplicates the Oid property, but is required by the VSO REST specification.
-    */
+     * Gets or sets the Git media object identifier. This Id property duplicates the Oid property, but is required by the VSO REST specification.
+     */
     id: string;
     /**
-    * Gets or sets the Git media object identifier. This property exists for adherence to the GitHub Git Media contract.
-    */
+     * Gets or sets the Git media object identifier. This property exists for adherence to the GitHub Git Media contract.
+     */
     oid: string;
     /**
-    * Gets or sets the size of the Git media object in bytes. This property exists for adherence to the GitHub Git Media contract.
-    */
+     * Gets or sets the size of the Git media object in bytes. This property exists for adherence to the GitHub Git Media contract.
+     */
     size: number;
     /**
-    * Gets or sets the URL for the Git media object.
-    */
+     * Gets or sets the URL for the Git media object.
+     */
     url: string;
 }
 export enum GitObjectType {
@@ -19480,7 +22411,6 @@ export enum GitPathActions {
 export interface GitPullRequest {
     _links: any;
     closedDate: Date;
-    codeReview: any;
     createdBy: VSS_Common_Contracts.IdentityRef;
     creationDate: Date;
     description: string;
@@ -19502,8 +22432,8 @@ export interface GitPullRequest {
 export interface GitPullRequestSearchCriteria {
     creatorId: string;
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     repositoryId: string;
     reviewerId: string;
@@ -19534,8 +22464,8 @@ export interface GitPushRef {
 export interface GitPushSearchCriteria {
     fromDate: Date;
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     includeRefUpdates: boolean;
     pusherId: string;
@@ -19544,60 +22474,60 @@ export interface GitPushSearchCriteria {
 }
 export interface GitQueryCommitsCriteria {
     /**
-    * Number of entries to skip
-    */
+     * Number of entries to skip
+     */
     $skip: number;
     /**
-    * Maximum number of entries to retrieve
-    */
+     * Maximum number of entries to retrieve
+     */
     $top: number;
     /**
-    * Alias or display name of the author
-    */
+     * Alias or display name of the author
+     */
     author: string;
     /**
-    * If provided, the earliest commit in the graph to search
-    */
+     * If provided, the earliest commit in the graph to search
+     */
     compareVersion: GitVersionDescriptor;
     /**
-    * If true, don't include delete history entries
-    */
+     * If true, don't include delete history entries
+     */
     excludeDeletes: boolean;
     /**
-    * If provided, a lower bound for filtering commits alphabetically
-    */
+     * If provided, a lower bound for filtering commits alphabetically
+     */
     fromCommitId: string;
     /**
-    * If provided, only include history entries created after this date (string)
-    */
+     * If provided, only include history entries created after this date (string)
+     */
     fromDate: string;
     /**
-    * If provided, specifies the exact commit ids of the commits to fetch. May not be combined with other parameters.
-    */
+     * If provided, specifies the exact commit ids of the commits to fetch. May not be combined with other parameters.
+     */
     ids: string[];
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     /**
-    * Path of item to search under
-    */
+     * Path of item to search under
+     */
     itemPath: string;
     /**
-    * If provided, identifies the commit or branch to search
-    */
+     * If provided, identifies the commit or branch to search
+     */
     itemVersion: GitVersionDescriptor;
     /**
-    * If provided, an upper bound for filtering commits alphabetically
-    */
+     * If provided, an upper bound for filtering commits alphabetically
+     */
     toCommitId: string;
     /**
-    * If provided, only include history entries created before this date (string)
-    */
+     * If provided, only include history entries created before this date (string)
+     */
     toDate: string;
     /**
-    * Alias or display name of the committer
-    */
+     * Alias or display name of the committer
+     */
     user: string;
 }
 export interface GitRef {
@@ -19615,46 +22545,46 @@ export interface GitRefUpdate {
 }
 export enum GitRefUpdateMode {
     /**
-    * Indicates the Git protocol model where any refs that can be updated will be updated, but any failures will not prevent other updates from succeeding.
-    */
+     * Indicates the Git protocol model where any refs that can be updated will be updated, but any failures will not prevent other updates from succeeding.
+     */
     BestEffort = 0,
     /**
-    * Indicates that all ref updates must succeed or none will succeed. All ref updates will be atomically written. If any failure is encountered, previously successful updates will be rolled back and the entire operation will fail.
-    */
+     * Indicates that all ref updates must succeed or none will succeed. All ref updates will be atomically written. If any failure is encountered, previously successful updates will be rolled back and the entire operation will fail.
+     */
     AllOrNone = 1,
 }
 export interface GitRefUpdateResult {
     /**
-    * Custom message for the result object For instance, Reason for failing.
-    */
+     * Custom message for the result object For instance, Reason for failing.
+     */
     customMessage: string;
     /**
-    * Ref name
-    */
+     * Ref name
+     */
     name: string;
     /**
-    * New object ID
-    */
+     * New object ID
+     */
     newObjectId: string;
     /**
-    * Old object ID
-    */
+     * Old object ID
+     */
     oldObjectId: string;
     /**
-    * Name of the plugin that rejected the updated.
-    */
+     * Name of the plugin that rejected the updated.
+     */
     rejectedBy: string;
     /**
-    * Repository ID
-    */
+     * Repository ID
+     */
     repositoryId: string;
     /**
-    * True if the ref update succeeded, false otherwise
-    */
+     * True if the ref update succeeded, false otherwise
+     */
     success: boolean;
     /**
-    * Status of the update from the TFS server.
-    */
+     * Status of the update from the TFS server.
+     */
     updateStatus: GitRefUpdateStatus;
 }
 export interface GitRefUpdateResultSet {
@@ -19669,68 +22599,68 @@ export interface GitRefUpdateResultSet {
 }
 export enum GitRefUpdateStatus {
     /**
-    * Indicates that the ref update request was completed successfully.
-    */
+     * Indicates that the ref update request was completed successfully.
+     */
     Succeeded = 0,
     /**
-    * Indicates that the ref update request could not be completed because part of the graph would be disconnected by this change, and the caller does not have ForcePush permission on the repository.
-    */
+     * Indicates that the ref update request could not be completed because part of the graph would be disconnected by this change, and the caller does not have ForcePush permission on the repository.
+     */
     ForcePushRequired = 1,
     /**
-    * Indicates that the ref update request could not be completed because the old object ID presented in the request was not the object ID of the ref when the database attempted the update. The most likely scenario is that the caller lost a race to update the ref.
-    */
+     * Indicates that the ref update request could not be completed because the old object ID presented in the request was not the object ID of the ref when the database attempted the update. The most likely scenario is that the caller lost a race to update the ref.
+     */
     StaleOldObjectId = 2,
     /**
-    * Indicates that the ref update request could not be completed because the ref name presented in the request was not valid.
-    */
+     * Indicates that the ref update request could not be completed because the ref name presented in the request was not valid.
+     */
     InvalidRefName = 3,
     /**
-    * The request was not processed
-    */
+     * The request was not processed
+     */
     Unprocessed = 4,
     /**
-    * The ref update request could not be completed because the new object ID for the ref could not be resolved to a commit object (potentially through any number of tags)
-    */
+     * The ref update request could not be completed because the new object ID for the ref could not be resolved to a commit object (potentially through any number of tags)
+     */
     UnresolvableToCommit = 5,
     /**
-    * The ref update request could not be completed because the user lacks write permissions required to write this ref
-    */
+     * The ref update request could not be completed because the user lacks write permissions required to write this ref
+     */
     WritePermissionRequired = 6,
     /**
-    * The ref update request could not be completed because the user lacks note creation permissions required to write this note
-    */
+     * The ref update request could not be completed because the user lacks note creation permissions required to write this note
+     */
     ManageNotePermissionRequired = 7,
     /**
-    * The ref update request could not be completed because the user lacks the permission to create a branch
-    */
+     * The ref update request could not be completed because the user lacks the permission to create a branch
+     */
     CreateBranchPermissionRequired = 8,
     /**
-    * The ref update request could not be completed because the user lacks the permission to create a tag
-    */
+     * The ref update request could not be completed because the user lacks the permission to create a tag
+     */
     CreateTagPermissionRequired = 9,
     /**
-    * The ref update could not be completed because it was rejected by the plugin.
-    */
+     * The ref update could not be completed because it was rejected by the plugin.
+     */
     RejectedByPlugin = 10,
     /**
-    * The ref update could not be completed because the ref is locked by another user.
-    */
+     * The ref update could not be completed because the ref is locked by another user.
+     */
     Locked = 11,
     /**
-    * The ref update could not be completed because, in case-insensitive mode, the ref name conflicts with an existing, differently-cased ref name.
-    */
+     * The ref update could not be completed because, in case-insensitive mode, the ref name conflicts with an existing, differently-cased ref name.
+     */
     RefNameConflict = 12,
     /**
-    * The ref update could not be completed because it was rejected by policy.
-    */
+     * The ref update could not be completed because it was rejected by policy.
+     */
     RejectedByPolicy = 13,
     /**
-    * Indicates that the ref update request was completed successfully, but the ref doesn't actually exist so no changes were made.  This should only happen during deletes.
-    */
+     * Indicates that the ref update request was completed successfully, but the ref doesn't actually exist so no changes were made.  This should only happen during deletes.
+     */
     SucceededNonExistentRef = 14,
     /**
-    * Indicates that the ref update request was completed successfully, but the passed-in ref was corrupt - as in, the old object ID was bad.  This should only happen during deletes.
-    */
+     * Indicates that the ref update request was completed successfully, but the passed-in ref was corrupt - as in, the old object ID was bad.  This should only happen during deletes.
+     */
     SucceededCorruptRef = 15,
 }
 export interface GitRepository {
@@ -19742,63 +22672,79 @@ export interface GitRepository {
     remoteUrl: string;
     url: string;
 }
+export enum GitRepositoryPermissions {
+    None = 0,
+    Administer = 1,
+    GenericRead = 2,
+    GenericContribute = 4,
+    ForcePush = 8,
+    CreateBranch = 16,
+    CreateTag = 32,
+    ManageNote = 64,
+    PolicyExempt = 128,
+    /**
+     * This defines the set of bits that are valid for the git permission space. When reading or writing git permissions, these are the only bits paid attention too.
+     */
+    All = 255,
+    BranchLevelPermissions = 141,
+}
 export interface GitTargetVersionDescriptor extends GitVersionDescriptor {
     /**
-    * Version string identifier (name of tag/branch, SHA1 of commit)
-    */
+     * Version string identifier (name of tag/branch, SHA1 of commit)
+     */
     targetVersion: string;
     /**
-    * Version options - Specify additional modifiers to version (e.g Previous)
-    */
+     * Version options - Specify additional modifiers to version (e.g Previous)
+     */
     targetVersionOptions: GitVersionOptions;
     /**
-    * Version type (branch, tag, or commit). Determines how Id is interpreted
-    */
+     * Version type (branch, tag, or commit). Determines how Id is interpreted
+     */
     targetVersionType: GitVersionType;
 }
 export interface GitTreeEntryRef {
     /**
-    * Blob or tree
-    */
+     * Blob or tree
+     */
     gitObjectType: GitObjectType;
     /**
-    * Mode represented as octal string
-    */
+     * Mode represented as octal string
+     */
     mode: string;
     /**
-    * SHA1 hash of git object
-    */
+     * SHA1 hash of git object
+     */
     objectId: string;
     /**
-    * Path relative to parent tree object
-    */
+     * Path relative to parent tree object
+     */
     relativePath: string;
     /**
-    * Size of content
-    */
+     * Size of content
+     */
     size: number;
     /**
-    * url to retrieve tree or blob
-    */
+     * url to retrieve tree or blob
+     */
     url: string;
 }
 export interface GitTreeRef {
     _links: any;
     /**
-    * SHA1 hash of git object
-    */
+     * SHA1 hash of git object
+     */
     objectId: string;
     /**
-    * Sum of sizes of all children
-    */
+     * Sum of sizes of all children
+     */
     size: number;
     /**
-    * Blobs and trees under this tree
-    */
+     * Blobs and trees under this tree
+     */
     treeEntries: GitTreeEntryRef[];
     /**
-    * Url to tree
-    */
+     * Url to tree
+     */
     url: string;
 }
 export interface GitUserDate {
@@ -19808,72 +22754,72 @@ export interface GitUserDate {
 }
 export interface GitVersionDescriptor {
     /**
-    * Version string identifier (name of tag/branch/index, SHA1 of commit)
-    */
+     * Version string identifier (name of tag/branch/index, SHA1 of commit)
+     */
     version: string;
     /**
-    * Version options - Specify additional modifiers to version (e.g Previous)
-    */
+     * Version options - Specify additional modifiers to version (e.g Previous)
+     */
     versionOptions: GitVersionOptions;
     /**
-    * Version type (branch, tag, commit, or index). Determines how Id is interpreted
-    */
+     * Version type (branch, tag, commit, or index). Determines how Id is interpreted
+     */
     versionType: GitVersionType;
 }
 export enum GitVersionOptions {
     /**
-    * Not specified
-    */
+     * Not specified
+     */
     None = 0,
     /**
-    * Commit that changed item prior to the current version
-    */
+     * Commit that changed item prior to the current version
+     */
     PreviousChange = 1,
     /**
-    * First parent of commit (HEAD^)
-    */
+     * First parent of commit (HEAD^)
+     */
     FirstParent = 2,
 }
 export enum GitVersionType {
     /**
-    * Interpret the version as a branch name
-    */
+     * Interpret the version as a branch name
+     */
     Branch = 0,
     /**
-    * Interpret the version as a tag name
-    */
+     * Interpret the version as a tag name
+     */
     Tag = 1,
     /**
-    * Interpret the version as a commit ID (SHA1)
-    */
+     * Interpret the version as a commit ID (SHA1)
+     */
     Commit = 2,
     /**
-    * Interpret the version as an index name
-    */
+     * Interpret the version as an index name
+     */
     Index = 3,
 }
 export interface HistoryEntry<T> {
     /**
-    * The Change list (changeset/commit/shelveset) for this point in history
-    */
+     * The Change list (changeset/commit/shelveset) for this point in history
+     */
     changeList: ChangeList<T>;
     /**
-    * The change made to the item from this change list (only relevant for File history, not folders)
-    */
+     * The change made to the item from this change list (only relevant for File history, not folders)
+     */
     itemChangeType: VersionControlChangeType;
     /**
-    * The path of the item at this point in history (only relevant for File history, not folders)
-    */
+     * The path of the item at this point in history (only relevant for File history, not folders)
+     */
     serverItem: string;
 }
 export interface HistoryQueryResults<T> {
     /**
-    * True if there are more results available to fetch (we're returning the max # of items requested) A more RESTy solution would be to include a Link header
-    */
+     * True if there are more results available to fetch (we're returning the max # of items requested) A more RESTy solution would be to include a Link header
+     */
     moreResultsAvailable: boolean;
     /**
-    * The history entries (results) from this query
-    */
+     * The history entries (results) from this query
+     */
     results: HistoryEntry<T>[];
 }
 export interface IdentityRefWithVote extends VSS_Common_Contracts.IdentityRef {
@@ -19897,16 +22843,16 @@ export enum ItemContentType {
     Base64Encoded = 1,
 }
 /**
-* Optional details to include when returning an item model
-*/
+ * Optional details to include when returning an item model
+ */
 export interface ItemDetailsOptions {
     /**
-    * If true, include metadata about the file type
-    */
+     * If true, include metadata about the file type
+     */
     includeContentMetadata: boolean;
     /**
-    * Specifies whether to include children (OneLevel), all descendants (Full) or None for folder items
-    */
+     * Specifies whether to include children (OneLevel), all descendants (Full) or None for folder items
+     */
     recursionLevel: VersionControlRecursionType;
 }
 export interface ItemModel {
@@ -19952,12 +22898,12 @@ export interface TfvcBranchRef extends TfvcShallowBranchRef {
 }
 export interface TfvcChange extends Change<TfvcItem> {
     /**
-    * List of merge sources in case of rename or branch creation.
-    */
+     * List of merge sources in case of rename or branch creation.
+     */
     mergeSources: TfvcMergeSource[];
     /**
-    * Version at which a (shelved) change was pended against
-    */
+     * Version at which a (shelved) change was pended against
+     */
     pendingVersion: number;
 }
 export interface TfvcChangeset extends TfvcChangesetRef {
@@ -19980,48 +22926,48 @@ export interface TfvcChangesetRef {
     url: string;
 }
 /**
-* Criteria used in a search for change lists
-*/
+ * Criteria used in a search for change lists
+ */
 export interface TfvcChangesetSearchCriteria {
     /**
-    * Alias or display name of user who made the changes
-    */
+     * Alias or display name of user who made the changes
+     */
     author: string;
     /**
-    * Whether or not to follow renames for the given item being queried
-    */
+     * Whether or not to follow renames for the given item being queried
+     */
     followRenames: boolean;
     /**
-    * If provided, only include changesets created after this date (string) Think of a better name for this.
-    */
+     * If provided, only include changesets created after this date (string) Think of a better name for this.
+     */
     fromDate: string;
     /**
-    * If provided, only include changesets after this changesetID
-    */
+     * If provided, only include changesets after this changesetID
+     */
     fromId: number;
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     /**
-    * Path of item to search under
-    */
+     * Path of item to search under
+     */
     path: string;
     /**
-    * If provided, only include changesets created before this date (string) Think of a better name for this.
-    */
+     * If provided, only include changesets created before this date (string) Think of a better name for this.
+     */
     toDate: string;
     /**
-    * If provided, a version descriptor for the latest change list to include
-    */
+     * If provided, a version descriptor for the latest change list to include
+     */
     toId: number;
 }
 export interface TfvcChangesetsRequestData {
     changesetIds: number[];
     commentLength: number;
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
 }
 export interface TfvcCheckinEventData {
@@ -20030,12 +22976,12 @@ export interface TfvcCheckinEventData {
 }
 export interface TfvcHistoryEntry extends HistoryEntry<TfvcItem> {
     /**
-    * The encoding of the item at this point in history (only relevant for File history, not folders)
-    */
+     * The encoding of the item at this point in history (only relevant for File history, not folders)
+     */
     encoding: number;
     /**
-    * The file id of the item at this point in history (only relevant for File history, not folders)
-    */
+     * The file id of the item at this point in history (only relevant for File history, not folders)
+     */
     fileId: number;
 }
 export interface TfvcItem extends ItemModel {
@@ -20046,8 +22992,8 @@ export interface TfvcItem extends ItemModel {
     version: number;
 }
 /**
-* Item path and Version descriptor properties
-*/
+ * Item path and Version descriptor properties
+ */
 export interface TfvcItemDescriptor {
     path: string;
     recursionLevel: VersionControlRecursionType;
@@ -20057,12 +23003,12 @@ export interface TfvcItemDescriptor {
 }
 export interface TfvcItemRequestData {
     /**
-    * If true, include metadata about the file type
-    */
+     * If true, include metadata about the file type
+     */
     includeContentMetadata: boolean;
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     itemDescriptors: TfvcItemDescriptor[];
 }
@@ -20081,8 +23027,8 @@ export interface TfvcLabelRef {
 }
 export interface TfvcLabelRequestData {
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     itemLabelFilter: string;
     labelScope: string;
@@ -20092,20 +23038,20 @@ export interface TfvcLabelRequestData {
 }
 export interface TfvcMergeSource {
     /**
-    * Indicates if this a rename source. If false, it is a merge source.
-    */
+     * Indicates if this a rename source. If false, it is a merge source.
+     */
     isRename: boolean;
     /**
-    * The server item of the merge source
-    */
+     * The server item of the merge source
+     */
     serverItem: string;
     /**
-    * Start of the version range
-    */
+     * Start of the version range
+     */
     versionFrom: number;
     /**
-    * End of the version range
-    */
+     * End of the version range
+     */
     versionTo: number;
 }
 export interface TfvcPolicyFailureInfo {
@@ -20137,32 +23083,32 @@ export interface TfvcShelvesetRef {
 }
 export interface TfvcShelvesetRequestData {
     /**
-    * Whether to include policyOverride and notes
-    */
+     * Whether to include policyOverride and notes
+     */
     includeDetails: boolean;
     /**
-    * Whether to include the _links field on the shallow references
-    */
+     * Whether to include the _links field on the shallow references
+     */
     includeLinks: boolean;
     /**
-    * Whether to include workItems
-    */
+     * Whether to include workItems
+     */
     includeWorkItems: boolean;
     /**
-    * Max number of changes to include
-    */
+     * Max number of changes to include
+     */
     maxChangeCount: number;
     /**
-    * Max length of comment
-    */
+     * Max length of comment
+     */
     maxCommentLength: number;
     /**
-    * Shelveset's name
-    */
+     * Shelveset's name
+     */
     name: string;
     /**
-    * Owner's ID. Could be a name or a guid.
-    */
+     * Owner's ID. Could be a name or a guid.
+     */
     owner: string;
 }
 export interface TfvcVersionDescriptor {
@@ -20365,6 +23311,21 @@ export var TypeInfo: {
     };
     GitRepository: {
         fields: any;
+    };
+    GitRepositoryPermissions: {
+        enumValues: {
+            "none": number;
+            "administer": number;
+            "genericRead": number;
+            "genericContribute": number;
+            "forcePush": number;
+            "createBranch": number;
+            "createTag": number;
+            "manageNote": number;
+            "policyExempt": number;
+            "all": number;
+            "branchLevelPermissions": number;
+        };
     };
     GitTargetVersionDescriptor: {
         fields: any;
@@ -20574,7 +23535,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
     static serviceInstanceId: string;
     constructor(rootRequestPath: string);
     /**
-     * Gets a single blob.
+     * [Preview API] Gets a single blob.
      *
      * @param {string} repositoryId
      * @param {string} sha1
@@ -20585,7 +23546,39 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBlob(repositoryId: string, sha1: string, project?: string, download?: boolean, fileName?: string): IPromise<Contracts.GitBlobRef>;
     /**
-     * Retrieve statistics about a single branch.
+     * [Preview API] Gets a single blob.
+     *
+     * @param {string} repositoryId
+     * @param {string} sha1
+     * @param {string} project - Project ID or project name
+     * @param {boolean} download
+     * @param {string} fileName
+     * @return IPromise<ArrayBuffer>
+     */
+    getBlobContent(repositoryId: string, sha1: string, project?: string, download?: boolean, fileName?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Gets one or more blobs in a zip file download.
+     *
+     * @param {string[]} blobIds
+     * @param {string} repositoryId
+     * @param {string} project - Project ID or project name
+     * @param {string} filename
+     * @return IPromise<ArrayBuffer>
+     */
+    getBlobsZip(blobIds: string[], repositoryId: string, project?: string, filename?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Gets a single blob.
+     *
+     * @param {string} repositoryId
+     * @param {string} sha1
+     * @param {string} project - Project ID or project name
+     * @param {boolean} download
+     * @param {string} fileName
+     * @return IPromise<ArrayBuffer>
+     */
+    getBlobZip(repositoryId: string, sha1: string, project?: string, download?: boolean, fileName?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Retrieve statistics about a single branch.
      *
      * @param {string} repositoryId - Friendly name or guid of repository
      * @param {string} name - Name of the branch
@@ -20595,7 +23588,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBranch(repositoryId: string, name: string, project?: string, baseVersionDescriptor?: Contracts.GitVersionDescriptor): IPromise<Contracts.GitBranchStats>;
     /**
-     * Retrieve statistics about all branches within a repository.
+     * [Preview API] Retrieve statistics about all branches within a repository.
      *
      * @param {string} repositoryId - Friendly name or guid of repository
      * @param {string} project - Project ID or project name
@@ -20604,7 +23597,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBranches(repositoryId: string, project?: string, baseVersionDescriptor?: Contracts.GitVersionDescriptor): IPromise<Contracts.GitBranchStats[]>;
     /**
-     * Retrieve changes for a particular commit.
+     * [Preview API] Retrieve changes for a particular commit.
      *
      * @param {string} commitId - The id of the commit.
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
@@ -20615,7 +23608,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getChanges(commitId: string, repositoryId: string, project?: string, top?: number, skip?: number): IPromise<Contracts.GitCommitChanges>;
     /**
-     * Create a git commit for a project
+     * [Preview API] Create a git commit for a project
      *
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
      * @param {string} project - Project ID or project name
@@ -20623,7 +23616,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createCommit(repositoryId: string, project?: string): IPromise<Contracts.GitCommit>;
     /**
-     * Retrieve a particular commit.
+     * [Preview API] Retrieve a particular commit.
      *
      * @param {string} commitId - The id of the commit.
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
@@ -20633,7 +23626,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getCommit(commitId: string, repositoryId: string, project?: string, changeCount?: number): IPromise<Contracts.GitCommit>;
     /**
-     * Retrieve git commits for a project
+     * [Preview API] Retrieve git commits for a project
      *
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
      * @param {Contracts.GitQueryCommitsCriteria} searchCriteria
@@ -20644,19 +23637,19 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getCommits(repositoryId: string, searchCriteria: Contracts.GitQueryCommitsCriteria, project?: string, skip?: number, top?: number): IPromise<Contracts.GitCommitRef[]>;
     /**
-     * Retrieve a list of commits associated with a particular push.
+     * [Preview API] Retrieve a list of commits associated with a particular push.
      *
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
      * @param {number} pushId - The id of the push.
      * @param {string} project - Project ID or project name
-     * @param {number} top - The maximum number of commits to return (&quot;get the top x commits&quot;).
+     * @param {number} top - The maximum number of commits to return ("get the top x commits").
      * @param {number} skip - The number of commits to skip.
      * @param {boolean} includeLinks
      * @return IPromise<Contracts.GitCommitRef[]>
      */
     getPushCommits(repositoryId: string, pushId: number, project?: string, top?: number, skip?: number, includeLinks?: boolean): IPromise<Contracts.GitCommitRef[]>;
     /**
-     * Retrieve git commits for a project
+     * [Preview API] Retrieve git commits for a project
      *
      * @param {Contracts.GitQueryCommitsCriteria} searchCriteria - Search options
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
@@ -20667,7 +23660,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getCommitsBatch(searchCriteria: Contracts.GitQueryCommitsCriteria, repositoryId: string, project?: string, skip?: number, top?: number): IPromise<Contracts.GitCommitRef[]>;
     /**
-     * Get Item Metadata and/or Content for a single item. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     * [Preview API] Get Item Metadata and/or Content for a single item. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
      *
      * @param {string} repositoryId
      * @param {string} path
@@ -20682,7 +23675,22 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getItem(repositoryId: string, path: string, project?: string, scopePath?: string, recursionLevel?: Contracts.VersionControlRecursionType, includeContentMetadata?: boolean, latestProcessedChange?: boolean, download?: boolean, versionDescriptor?: Contracts.GitVersionDescriptor): IPromise<Contracts.GitItem>;
     /**
-     * Get Item Metadata and/or Content for a collection of items. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     * [Preview API] Get Item Metadata and/or Content for a single item. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     *
+     * @param {string} repositoryId
+     * @param {string} path
+     * @param {string} project - Project ID or project name
+     * @param {string} scopePath
+     * @param {Contracts.VersionControlRecursionType} recursionLevel
+     * @param {boolean} includeContentMetadata
+     * @param {boolean} latestProcessedChange
+     * @param {boolean} download
+     * @param {Contracts.GitVersionDescriptor} versionDescriptor
+     * @return IPromise<ArrayBuffer>
+     */
+    getItemContent(repositoryId: string, path: string, project?: string, scopePath?: string, recursionLevel?: Contracts.VersionControlRecursionType, includeContentMetadata?: boolean, latestProcessedChange?: boolean, download?: boolean, versionDescriptor?: Contracts.GitVersionDescriptor): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Get Item Metadata and/or Content for a collection of items. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
      *
      * @param {string} repositoryId
      * @param {string} project - Project ID or project name
@@ -20697,7 +23705,37 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getItems(repositoryId: string, project?: string, scopePath?: string, recursionLevel?: Contracts.VersionControlRecursionType, includeContentMetadata?: boolean, latestProcessedChange?: boolean, download?: boolean, includeLinks?: boolean, versionDescriptor?: Contracts.GitVersionDescriptor): IPromise<Contracts.GitItem[]>;
     /**
-     * Post for retrieving a creating a batch out of a set of items in a repo / project given a list of paths or a long path
+     * [Preview API] Get Item Metadata and/or Content for a single item. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     *
+     * @param {string} repositoryId
+     * @param {string} path
+     * @param {string} project - Project ID or project name
+     * @param {string} scopePath
+     * @param {Contracts.VersionControlRecursionType} recursionLevel
+     * @param {boolean} includeContentMetadata
+     * @param {boolean} latestProcessedChange
+     * @param {boolean} download
+     * @param {Contracts.GitVersionDescriptor} versionDescriptor
+     * @return IPromise<string>
+     */
+    getItemText(repositoryId: string, path: string, project?: string, scopePath?: string, recursionLevel?: Contracts.VersionControlRecursionType, includeContentMetadata?: boolean, latestProcessedChange?: boolean, download?: boolean, versionDescriptor?: Contracts.GitVersionDescriptor): IPromise<string>;
+    /**
+     * [Preview API] Get Item Metadata and/or Content for a single item. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     *
+     * @param {string} repositoryId
+     * @param {string} path
+     * @param {string} project - Project ID or project name
+     * @param {string} scopePath
+     * @param {Contracts.VersionControlRecursionType} recursionLevel
+     * @param {boolean} includeContentMetadata
+     * @param {boolean} latestProcessedChange
+     * @param {boolean} download
+     * @param {Contracts.GitVersionDescriptor} versionDescriptor
+     * @return IPromise<ArrayBuffer>
+     */
+    getItemZip(repositoryId: string, path: string, project?: string, scopePath?: string, recursionLevel?: Contracts.VersionControlRecursionType, includeContentMetadata?: boolean, latestProcessedChange?: boolean, download?: boolean, versionDescriptor?: Contracts.GitVersionDescriptor): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Post for retrieving a creating a batch out of a set of items in a repo / project given a list of paths or a long path
      *
      * @param {Contracts.GitItemRequestData} requestData
      * @param {string} repositoryId
@@ -20706,7 +23744,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getItemsBatch(requestData: Contracts.GitItemRequestData, repositoryId: string, project?: string): IPromise<Contracts.GitItem[][]>;
     /**
-     * Adds a reviewer to a git pull request
+     * [Preview API] Adds a reviewer to a git pull request
      *
      * @param {Contracts.IdentityRefWithVote} reviewer
      * @param {string} repositoryId
@@ -20717,7 +23755,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createPullRequestReviewer(reviewer: Contracts.IdentityRefWithVote, repositoryId: string, pullRequestId: number, reviewerId: string, project?: string): IPromise<Contracts.IdentityRefWithVote>;
     /**
-     * Adds reviewers to a git pull request
+     * [Preview API] Adds reviewers to a git pull request
      *
      * @param {VSS_Common_Contracts.IdentityRef[]} reviewers
      * @param {string} repositoryId
@@ -20727,7 +23765,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createPullRequestReviewers(reviewers: VSS_Common_Contracts.IdentityRef[], repositoryId: string, pullRequestId: number, project?: string): IPromise<Contracts.IdentityRefWithVote[]>;
     /**
-     * Adds reviewers to a git pull request
+     * [Preview API] Adds reviewers to a git pull request
      *
      * @param {string} repositoryId
      * @param {number} pullRequestId
@@ -20737,7 +23775,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deletePullRequestReviewer(repositoryId: string, pullRequestId: number, reviewerId: string, project?: string): IPromise<void>;
     /**
-     * Retrieve a reviewer from a pull request
+     * [Preview API] Retrieve a reviewer from a pull request
      *
      * @param {string} repositoryId
      * @param {number} pullRequestId
@@ -20747,7 +23785,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPullRequestReviewer(repositoryId: string, pullRequestId: number, reviewerId: string, project?: string): IPromise<Contracts.IdentityRefWithVote>;
     /**
-     * Retrieve a pull request reviewers
+     * [Preview API] Retrieve a pull request reviewers
      *
      * @param {string} repositoryId
      * @param {number} pullRequestId
@@ -20756,7 +23794,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPullRequestReviewers(repositoryId: string, pullRequestId: number, project?: string): IPromise<Contracts.IdentityRefWithVote[]>;
     /**
-     * Create a git pull request
+     * [Preview API] Create a git pull request
      *
      * @param {Contracts.GitPullRequest} gitPullRequestToCreate
      * @param {string} repositoryId
@@ -20765,7 +23803,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createPullRequest(gitPullRequestToCreate: Contracts.GitPullRequest, repositoryId: string, project?: string): IPromise<Contracts.GitPullRequest>;
     /**
-     * Retrieve a pull request
+     * [Preview API] Retrieve a pull request
      *
      * @param {string} repositoryId
      * @param {number} pullRequestId
@@ -20777,7 +23815,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPullRequest(repositoryId: string, pullRequestId: number, project?: string, maxCommentLength?: number, skip?: number, top?: number): IPromise<Contracts.GitPullRequest>;
     /**
-     * Query for pull requests
+     * [Preview API] Query for pull requests
      *
      * @param {string} repositoryId
      * @param {Contracts.GitPullRequestSearchCriteria} searchCriteria
@@ -20789,7 +23827,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPullRequests(repositoryId: string, searchCriteria: Contracts.GitPullRequestSearchCriteria, project?: string, maxCommentLength?: number, skip?: number, top?: number): IPromise<Contracts.GitPullRequest[]>;
     /**
-     * Updates a pull request
+     * [Preview API] Updates a pull request
      *
      * @param {Contracts.GitPullRequest} gitPullRequestToUpdate
      * @param {string} repositoryId
@@ -20799,7 +23837,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updatePullRequest(gitPullRequestToUpdate: Contracts.GitPullRequest, repositoryId: string, pullRequestId: number, project?: string): IPromise<Contracts.GitPullRequest>;
     /**
-     * Retrieve a pull request work items
+     * [Preview API] Retrieve a pull request work items
      *
      * @param {string} repositoryId
      * @param {number} pullRequestId
@@ -20810,7 +23848,16 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPullRequestWorkItems(repositoryId: string, pullRequestId: number, project?: string, commitsTop?: number, commitsSkip?: number): IPromise<Contracts.AssociatedWorkItem[]>;
     /**
-     * Retrieve a particular push.
+     * [Preview API] Push changes to the repository.
+     *
+     * @param {Contracts.GitPush} push
+     * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, a project-scoped route must be used.
+     * @param {string} project - Project ID or project name
+     * @return IPromise<Contracts.GitPush>
+     */
+    createPush(push: Contracts.GitPush, repositoryId: string, project?: string): IPromise<Contracts.GitPush>;
+    /**
+     * [Preview API] Retrieve a particular push.
      *
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
      * @param {number} pushId - The id of the push.
@@ -20821,7 +23868,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPush(repositoryId: string, pushId: number, project?: string, includeCommits?: number, includeRefUpdates?: boolean): IPromise<Contracts.GitPush>;
     /**
-     * Retrieves pushes associated with the specified repository.
+     * [Preview API] Retrieves pushes associated with the specified repository.
      *
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
      * @param {string} project - Project ID or project name
@@ -20832,7 +23879,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getPushes(repositoryId: string, project?: string, skip?: number, top?: number, searchCriteria?: Contracts.GitPushSearchCriteria): IPromise<Contracts.GitPush[]>;
     /**
-     * Queries the provided repository for its refs and returns them.
+     * [Preview API] Queries the provided repository for its refs and returns them.
      *
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
      * @param {string} project - Project ID or project name
@@ -20842,7 +23889,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getRefs(repositoryId: string, project?: string, filter?: string, includeLinks?: boolean): IPromise<Contracts.GitRef[]>;
     /**
-     * Creates or updates refs with the given information
+     * [Preview API] Creates or updates refs with the given information
      *
      * @param {Contracts.GitRefUpdate[]} refUpdates - List of ref updates to attempt to perform
      * @param {string} repositoryId - The id or friendly name of the repository. To use the friendly name, projectId must also be specified.
@@ -20852,7 +23899,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateRefs(refUpdates: Contracts.GitRefUpdate[], repositoryId: string, project?: string, projectId?: string): IPromise<Contracts.GitRefUpdateResult[]>;
     /**
-     * Create a git repository
+     * [Preview API] Create a git repository
      *
      * @param {Contracts.GitRepository} gitRepositoryToCreate
      * @param {string} project - Project ID or project name
@@ -20860,7 +23907,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createRepository(gitRepositoryToCreate: Contracts.GitRepository, project?: string): IPromise<Contracts.GitRepository>;
     /**
-     * Delete a git repository
+     * [Preview API] Delete a git repository
      *
      * @param {string} repositoryId
      * @param {string} project - Project ID or project name
@@ -20868,7 +23915,7 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteRepository(repositoryId: string, project?: string): IPromise<void>;
     /**
-     * Retrieve git repositories.
+     * [Preview API] Retrieve git repositories.
      *
      * @param {string} project - Project ID or project name
      * @param {boolean} includeLinks
@@ -20876,13 +23923,15 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getRepositories(project?: string, includeLinks?: boolean): IPromise<Contracts.GitRepository[]>;
     /**
+     * [Preview API]
+     *
      * @param {string} repositoryId
      * @param {string} project - Project ID or project name
      * @return IPromise<Contracts.GitRepository>
      */
     getRepository(repositoryId: string, project?: string): IPromise<Contracts.GitRepository>;
     /**
-     * Updates the Git repository with the single populated change in the specified repository information.
+     * [Preview API] Updates the Git repository with the single populated change in the specified repository information.
      *
      * @param {Contracts.GitRepository} newRepositoryInfo
      * @param {string} repositoryId
@@ -20891,6 +23940,8 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateRepository(newRepositoryInfo: Contracts.GitRepository, repositoryId: string, project?: string): IPromise<Contracts.GitRepository>;
     /**
+     * [Preview API]
+     *
      * @param {string} repositoryId
      * @param {string} sha1
      * @param {string} project - Project ID or project name
@@ -20900,6 +23951,18 @@ export class GitHttpClient extends VSS_WebApi.VssHttpClient {
      * @return IPromise<Contracts.GitTreeRef>
      */
     getTree(repositoryId: string, sha1: string, project?: string, projectId?: string, recursive?: boolean, fileName?: string): IPromise<Contracts.GitTreeRef>;
+    /**
+     * [Preview API]
+     *
+     * @param {string} repositoryId
+     * @param {string} sha1
+     * @param {string} project - Project ID or project name
+     * @param {string} projectId
+     * @param {boolean} recursive
+     * @param {string} fileName
+     * @return IPromise<ArrayBuffer>
+     */
+    getTreeZip(repositoryId: string, sha1: string, project?: string, projectId?: string, recursive?: boolean, fileName?: string): IPromise<ArrayBuffer>;
 }
 }
 declare module "TFS/VersionControl/TfvcRestClient" {
@@ -20909,7 +23972,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
     static serviceInstanceId: string;
     constructor(rootRequestPath: string);
     /**
-     * Get a single branch hierarchy at the given path with parents or children (if specified)
+     * [Preview API] Get a single branch hierarchy at the given path with parents or children (if specified)
      *
      * @param {string} path
      * @param {string} project - Project ID or project name
@@ -20919,7 +23982,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBranch(path: string, project?: string, includeParent?: boolean, includeChildren?: boolean): IPromise<TFS_VersionControl_Contracts.TfvcBranch>;
     /**
-     * Get a collection of branch roots -- first-level children, branches with no parents
+     * [Preview API] Get a collection of branch roots -- first-level children, branches with no parents
      *
      * @param {string} project - Project ID or project name
      * @param {boolean} includeParent
@@ -20930,7 +23993,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBranches(project?: string, includeParent?: boolean, includeChildren?: boolean, includeDeleted?: boolean, includeLinks?: boolean): IPromise<TFS_VersionControl_Contracts.TfvcBranch[]>;
     /**
-     * Get branch hierarchies below the specified scopePath
+     * [Preview API] Get branch hierarchies below the specified scopePath
      *
      * @param {string} scopePath
      * @param {string} project - Project ID or project name
@@ -20940,7 +24003,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBranchRefs(scopePath: string, project?: string, includeDeleted?: boolean, includeLinks?: boolean): IPromise<TFS_VersionControl_Contracts.TfvcBranchRef[]>;
     /**
-     * Retrieve Tfvc changes for a given changeset
+     * [Preview API] Retrieve Tfvc changes for a given changeset
      *
      * @param {number} id
      * @param {number} skip
@@ -20949,7 +24012,15 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getChangesetChanges(id?: number, skip?: number, top?: number): IPromise<TFS_VersionControl_Contracts.TfvcChange[]>;
     /**
-     * Retrieve a Tfvc Changeset
+     * [Preview API]
+     *
+     * @param {TFS_VersionControl_Contracts.TfvcChangeset} changeset
+     * @param {string} project - Project ID or project name
+     * @return IPromise<TFS_VersionControl_Contracts.TfvcChangesetRef>
+     */
+    createChangeset(changeset: TFS_VersionControl_Contracts.TfvcChangeset, project?: string): IPromise<TFS_VersionControl_Contracts.TfvcChangesetRef>;
+    /**
+     * [Preview API] Retrieve a Tfvc Changeset
      *
      * @param {number} id
      * @param {string} project - Project ID or project name
@@ -20966,7 +24037,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getChangeset(id: number, project?: string, maxChangeCount?: number, includeDetails?: boolean, includeWorkItems?: boolean, maxCommentLength?: number, includeSourceRename?: boolean, skip?: number, top?: number, orderby?: string, searchCriteria?: TFS_VersionControl_Contracts.TfvcChangesetSearchCriteria): IPromise<TFS_VersionControl_Contracts.TfvcChangeset>;
     /**
-     * Retrieve Tfvc changesets
+     * [Preview API] Retrieve Tfvc changesets
      *
      * @param {string} project - Project ID or project name
      * @param {number} maxChangeCount
@@ -20982,17 +24053,21 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getChangesets(project?: string, maxChangeCount?: number, includeDetails?: boolean, includeWorkItems?: boolean, maxCommentLength?: number, includeSourceRename?: boolean, skip?: number, top?: number, orderby?: string, searchCriteria?: TFS_VersionControl_Contracts.TfvcChangesetSearchCriteria): IPromise<TFS_VersionControl_Contracts.TfvcChangesetRef[]>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_VersionControl_Contracts.TfvcChangesetsRequestData} changesetsRequestData
      * @return IPromise<TFS_VersionControl_Contracts.TfvcChangesetRef[]>
      */
     getBatchedChangesets(changesetsRequestData: TFS_VersionControl_Contracts.TfvcChangesetsRequestData): IPromise<TFS_VersionControl_Contracts.TfvcChangesetRef[]>;
     /**
+     * [Preview API]
+     *
      * @param {number} id
      * @return IPromise<TFS_VersionControl_Contracts.AssociatedWorkItem[]>
      */
     getChangesetWorkItems(id?: number): IPromise<TFS_VersionControl_Contracts.AssociatedWorkItem[]>;
     /**
-     * Post for retrieving a set of items given a list of paths or a long path. Allows for specifying the recursionLevel and version descriptors for each path.
+     * [Preview API] Post for retrieving a set of items given a list of paths or a long path. Allows for specifying the recursionLevel and version descriptors for each path.
      *
      * @param {TFS_VersionControl_Contracts.TfvcItemRequestData} itemRequestData
      * @param {string} project - Project ID or project name
@@ -21000,7 +24075,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getItemsBatch(itemRequestData: TFS_VersionControl_Contracts.TfvcItemRequestData, project?: string): IPromise<TFS_VersionControl_Contracts.TfvcItem[][]>;
     /**
-     * Get Item Metadata and/or Content. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     * [Preview API] Get Item Metadata and/or Content. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
      *
      * @param {string} path
      * @param {string} project - Project ID or project name
@@ -21013,7 +24088,20 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getItem(path: string, project?: string, fileName?: string, download?: boolean, scopePath?: string, recursionLevel?: TFS_VersionControl_Contracts.VersionControlRecursionType, versionDescriptor?: TFS_VersionControl_Contracts.TfvcVersionDescriptor): IPromise<TFS_VersionControl_Contracts.TfvcItem>;
     /**
-     * Get a list of Tfvc items
+     * [Preview API] Get Item Metadata and/or Content. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     *
+     * @param {string} path
+     * @param {string} project - Project ID or project name
+     * @param {string} fileName
+     * @param {boolean} download
+     * @param {string} scopePath
+     * @param {TFS_VersionControl_Contracts.VersionControlRecursionType} recursionLevel
+     * @param {TFS_VersionControl_Contracts.TfvcVersionDescriptor} versionDescriptor
+     * @return IPromise<ArrayBuffer>
+     */
+    getItemContent(path: string, project?: string, fileName?: string, download?: boolean, scopePath?: string, recursionLevel?: TFS_VersionControl_Contracts.VersionControlRecursionType, versionDescriptor?: TFS_VersionControl_Contracts.TfvcVersionDescriptor): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Get a list of Tfvc items
      *
      * @param {string} project - Project ID or project name
      * @param {string} scopePath
@@ -21024,7 +24112,33 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getItems(project?: string, scopePath?: string, recursionLevel?: TFS_VersionControl_Contracts.VersionControlRecursionType, includeLinks?: boolean, versionDescriptor?: TFS_VersionControl_Contracts.TfvcVersionDescriptor): IPromise<TFS_VersionControl_Contracts.TfvcItem[]>;
     /**
-     * Get items under a label.
+     * [Preview API] Get Item Metadata and/or Content. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     *
+     * @param {string} path
+     * @param {string} project - Project ID or project name
+     * @param {string} fileName
+     * @param {boolean} download
+     * @param {string} scopePath
+     * @param {TFS_VersionControl_Contracts.VersionControlRecursionType} recursionLevel
+     * @param {TFS_VersionControl_Contracts.TfvcVersionDescriptor} versionDescriptor
+     * @return IPromise<string>
+     */
+    getItemText(path: string, project?: string, fileName?: string, download?: boolean, scopePath?: string, recursionLevel?: TFS_VersionControl_Contracts.VersionControlRecursionType, versionDescriptor?: TFS_VersionControl_Contracts.TfvcVersionDescriptor): IPromise<string>;
+    /**
+     * [Preview API] Get Item Metadata and/or Content. The download parameter is to indicate whether the content should be available as a download or just sent as a stream in the response. Doesn't apply to zipped content which is always returned as a download.
+     *
+     * @param {string} path
+     * @param {string} project - Project ID or project name
+     * @param {string} fileName
+     * @param {boolean} download
+     * @param {string} scopePath
+     * @param {TFS_VersionControl_Contracts.VersionControlRecursionType} recursionLevel
+     * @param {TFS_VersionControl_Contracts.TfvcVersionDescriptor} versionDescriptor
+     * @return IPromise<ArrayBuffer>
+     */
+    getItemZip(path: string, project?: string, fileName?: string, download?: boolean, scopePath?: string, recursionLevel?: TFS_VersionControl_Contracts.VersionControlRecursionType, versionDescriptor?: TFS_VersionControl_Contracts.TfvcVersionDescriptor): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Get items under a label.
      *
      * @param {string} labelId - Unique identifier of label
      * @param {number} top - Max number of items to return
@@ -21033,7 +24147,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getLabelItems(labelId: string, top?: number, skip?: number): IPromise<TFS_VersionControl_Contracts.TfvcItem[]>;
     /**
-     * Get a single deep label.
+     * [Preview API] Get a single deep label.
      *
      * @param {string} labelId - Unique identifier of label
      * @param {TFS_VersionControl_Contracts.TfvcLabelRequestData} requestData - maxItemCount
@@ -21042,7 +24156,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getLabel(labelId: string, requestData: TFS_VersionControl_Contracts.TfvcLabelRequestData, project?: string): IPromise<TFS_VersionControl_Contracts.TfvcLabel>;
     /**
-     * Get a collection of shallow label references.
+     * [Preview API] Get a collection of shallow label references.
      *
      * @param {TFS_VersionControl_Contracts.TfvcLabelRequestData} requestData - labelScope, name, owner, and itemLabelFilter
      * @param {string} project - Project ID or project name
@@ -21052,7 +24166,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getLabels(requestData: TFS_VersionControl_Contracts.TfvcLabelRequestData, project?: string, top?: number, skip?: number): IPromise<TFS_VersionControl_Contracts.TfvcLabelRef[]>;
     /**
-     * Retrieve the version control information for a given Team Project
+     * [Preview API] Retrieve the version control information for a given Team Project
      *
      * @param {string} projectId - The id (or name) of the team project
      * @param {string} project - Project ID or project name
@@ -21060,12 +24174,14 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getProjectInfo(projectId: string, project?: string): IPromise<TFS_VersionControl_Contracts.VersionControlProjectInfo>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @return IPromise<TFS_VersionControl_Contracts.VersionControlProjectInfo[]>
      */
     getProjectInfos(project?: string): IPromise<TFS_VersionControl_Contracts.VersionControlProjectInfo[]>;
     /**
-     * Get changes included in a shelveset.
+     * [Preview API] Get changes included in a shelveset.
      *
      * @param {string} shelvesetId - Shelveset's unique ID
      * @param {number} top - Max number of changes to return
@@ -21074,7 +24190,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getShelvesetChanges(shelvesetId: string, top?: number, skip?: number): IPromise<TFS_VersionControl_Contracts.TfvcChange[]>;
     /**
-     * Get a single deep shelveset.
+     * [Preview API] Get a single deep shelveset.
      *
      * @param {string} shelvesetId - Shelveset's unique ID
      * @param {TFS_VersionControl_Contracts.TfvcShelvesetRequestData} requestData - includeDetails, includeWorkItems, maxChangeCount, and maxCommentLength
@@ -21082,7 +24198,7 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getShelveset(shelvesetId: string, requestData: TFS_VersionControl_Contracts.TfvcShelvesetRequestData): IPromise<TFS_VersionControl_Contracts.TfvcShelveset>;
     /**
-     * Return a collection of shallow shelveset references.
+     * [Preview API] Return a collection of shallow shelveset references.
      *
      * @param {TFS_VersionControl_Contracts.TfvcShelvesetRequestData} requestData - name, owner, and maxCommentLength
      * @param {number} top - Max number of shelvesets to return
@@ -21091,12 +24207,48 @@ export class TfvcHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getShelvesets(requestData: TFS_VersionControl_Contracts.TfvcShelvesetRequestData, top?: number, skip?: number): IPromise<TFS_VersionControl_Contracts.TfvcShelvesetRef[]>;
     /**
-     * Get work items associated with a shelveset.
+     * [Preview API] Get work items associated with a shelveset.
      *
      * @param {string} shelvesetId - Shelveset's unique ID
      * @return IPromise<TFS_VersionControl_Contracts.AssociatedWorkItem[]>
      */
     getShelvesetWorkItems(shelvesetId: string): IPromise<TFS_VersionControl_Contracts.AssociatedWorkItem[]>;
+}
+}
+declare module "TFS/VersionControl/UIContracts" {
+import VCContracts = require("TFS/VersionControl/Contracts");
+import DiscussionContracts = require("TFS/Discussion/Contracts");
+export interface ISourceItem extends VCContracts.ItemModel {
+    sourceProvider: string;
+    item: VCContracts.GitItem | VCContracts.TfvcItem;
+}
+export interface SourceItemContext {
+    item: ISourceItem;
+    version: string;
+    gitRepository?: VCContracts.GitRepository;
+}
+export interface GitBranchContext {
+    repository: VCContracts.GitRepository;
+    ref: VCContracts.GitRef;
+    view: {
+        refresh: () => void;
+    };
+}
+export interface GitBranchDiffContext {
+    gitBranchDiff: VCContracts.GitCommitDiffs;
+    repository: VCContracts.GitRepository;
+    view: {
+        refresh: () => void;
+    };
+}
+export interface ChangeListSourceItemContext {
+    change: VCContracts.GitChange | VCContracts.TfvcChange;
+    changeList: VCContracts.ChangeList<VCContracts.GitItem> | VCContracts.ChangeList<VCContracts.TfvcItem>;
+}
+export interface ChangeListDiscussionCommentContext {
+    changeList: VCContracts.ChangeList<VCContracts.GitItem> | VCContracts.ChangeList<VCContracts.TfvcItem>;
+    discussionThread: DiscussionContracts.DiscussionThread;
+    discussionComment: DiscussionContracts.DiscussionComment;
 }
 }
 declare module "TFS/WorkItemTracking/Contracts" {
@@ -21209,6 +24361,22 @@ export enum QueryType {
     Flat = 1,
     Tree = 2,
     OneHop = 3,
+}
+export interface ReportingWorkItemLink {
+    changedDate: Date;
+    isActive: boolean;
+    rel: string;
+    sourceId: number;
+    targetId: number;
+}
+export interface ReportingWorkItemLinksBatch extends StreamedBatch<ReportingWorkItemLink> {
+}
+export interface ReportingWorkItemRevisionsBatch extends StreamedBatch<WorkItem> {
+}
+export interface StreamedBatch<T> {
+    isLastBatch: boolean;
+    nextLink: string;
+    values: T[];
 }
 export enum TemplateType {
     WorkItemType = 0,
@@ -21367,6 +24535,7 @@ export interface WorkItemUpdate extends WorkItemTrackingResourceReference {
     rev: number;
     revisedBy: IdentityReference;
     revisedDate: Date;
+    workItemId: number;
 }
 export var TypeInfo: {
     AttachmentReference: {
@@ -21460,6 +24629,18 @@ export var TypeInfo: {
             "tree": number;
             "oneHop": number;
         };
+    };
+    ReportingWorkItemLink: {
+        fields: any;
+    };
+    ReportingWorkItemLinksBatch: {
+        fields: any;
+    };
+    ReportingWorkItemRevisionsBatch: {
+        fields: any;
+    };
+    StreamedBatch: {
+        fields: any;
     };
     TemplateType: {
         enumValues: {
@@ -21578,12 +24759,41 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
     static serviceInstanceId: string;
     constructor(rootRequestPath: string);
     /**
+     * [Preview API] Creates an attachment.
+     *
+     * @param {string} content
+     * @param {string} fileName
+     * @param {string} uploadType
+     * @return IPromise<Contracts.AttachmentReference>
+     */
+    createAttachment(content: string, fileName?: string, uploadType?: string): IPromise<Contracts.AttachmentReference>;
+    /**
+     * [Preview API] Returns an attachment
+     *
+     * @param {string} id
+     * @param {string} fileName
+     * @return IPromise<ArrayBuffer>
+     */
+    getAttachmentContent(id: string, fileName?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API] Returns an attachment
+     *
+     * @param {string} id
+     * @param {string} fileName
+     * @return IPromise<ArrayBuffer>
+     */
+    getAttachmentZip(id: string, fileName?: string): IPromise<ArrayBuffer>;
+    /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {number} depth
      * @return IPromise<Contracts.WorkItemClassificationNode[]>
      */
     getRootNodes(project: string, depth?: number): IPromise<Contracts.WorkItemClassificationNode[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.WorkItemClassificationNode} postedNode
      * @param {string} project - Project ID or project name
      * @param {Contracts.TreeStructureGroup} structureGroup
@@ -21592,6 +24802,8 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createOrUpdateClassificationNode(postedNode: Contracts.WorkItemClassificationNode, project: string, structureGroup: Contracts.TreeStructureGroup, path?: string): IPromise<Contracts.WorkItemClassificationNode>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {Contracts.TreeStructureGroup} structureGroup
      * @param {string} path
@@ -21600,6 +24812,8 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     deleteClassificationNode(project: string, structureGroup: Contracts.TreeStructureGroup, path?: string, reclassifyId?: number): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {Contracts.TreeStructureGroup} structureGroup
      * @param {string} path
@@ -21608,6 +24822,8 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getClassificationNode(project: string, structureGroup: Contracts.TreeStructureGroup, path?: string, depth?: number): IPromise<Contracts.WorkItemClassificationNode>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.WorkItemClassificationNode} postedNode
      * @param {string} project - Project ID or project name
      * @param {Contracts.TreeStructureGroup} structureGroup
@@ -21616,16 +24832,20 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateClassificationNode(postedNode: Contracts.WorkItemClassificationNode, project: string, structureGroup: Contracts.TreeStructureGroup, path?: string): IPromise<Contracts.WorkItemClassificationNode>;
     /**
+     * [Preview API]
+     *
      * @param {string} field
      * @return IPromise<Contracts.WorkItemField>
      */
     getField(field: string): IPromise<Contracts.WorkItemField>;
     /**
+     * [Preview API]
+     *
      * @return IPromise<Contracts.WorkItemField[]>
      */
     getFields(): IPromise<Contracts.WorkItemField[]>;
     /**
-     * Returns history of all revision for a given work item ID
+     * [Preview API] Returns history of all revision for a given work item ID
      *
      * @param {number} id
      * @param {number} top
@@ -21634,7 +24854,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getHistory(id: number, top?: number, skip?: number): IPromise<Contracts.WorkItemHistory[]>;
     /**
-     * Returns the history value of particular revision
+     * [Preview API] Returns the history value of particular revision
      *
      * @param {number} id
      * @param {number} revisionNumber
@@ -21642,7 +24862,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getHistoryById(id: number, revisionNumber: number): IPromise<Contracts.WorkItemHistory>;
     /**
-     * Creates a query, or moves a query.
+     * [Preview API] Creates a query, or moves a query.
      *
      * @param {Contracts.QueryHierarchyItem} postedQuery - The query to create.
      * @param {string} project - Project ID or project name
@@ -21651,13 +24871,15 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     createQuery(postedQuery: Contracts.QueryHierarchyItem, project: string, query: string): IPromise<Contracts.QueryHierarchyItem>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @param {string} query
      * @return IPromise<void>
      */
     deleteQuery(project: string, query: string): IPromise<void>;
     /**
-     * Retrieves all queries the user has access to in the current project
+     * [Preview API] Retrieves all queries the user has access to in the current project
      *
      * @param {string} project - Project ID or project name
      * @param {Contracts.QueryExpand} expand
@@ -21667,7 +24889,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getQueries(project: string, expand?: Contracts.QueryExpand, depth?: number, includeDeleted?: boolean): IPromise<Contracts.QueryHierarchyItem[]>;
     /**
-     * Retrieves a single query by project and either id or path
+     * [Preview API] Retrieves a single query by project and either id or path
      *
      * @param {string} project - Project ID or project name
      * @param {string} query
@@ -21678,6 +24900,8 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getQuery(project: string, query: string, expand?: Contracts.QueryExpand, depth?: number, includeDeleted?: boolean): IPromise<Contracts.QueryHierarchyItem>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.QueryHierarchyItem} queryUpdate
      * @param {string} project - Project ID or project name
      * @param {string} query
@@ -21686,7 +24910,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateQuery(queryUpdate: Contracts.QueryHierarchyItem, project: string, query: string, undeleteDescendants?: boolean): IPromise<Contracts.QueryHierarchyItem>;
     /**
-     * Returns a fully hydrated work item for the requested revision
+     * [Preview API] Returns a fully hydrated work item for the requested revision
      *
      * @param {number} id
      * @param {number} revisionNumber
@@ -21695,7 +24919,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getRevision(id: number, revisionNumber: number, expand?: Contracts.WorkItemExpand): IPromise<Contracts.WorkItem>;
     /**
-     * Returns the list of fully hydrated work item revisions, paged.
+     * [Preview API] Returns the list of fully hydrated work item revisions, paged.
      *
      * @param {number} id
      * @param {number} top
@@ -21705,14 +24929,14 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getRevisions(id: number, top?: number, skip?: number, expand?: Contracts.WorkItemExpand): IPromise<Contracts.WorkItem[]>;
     /**
-     * Validates the fields values.
+     * [Preview API] Validates the fields values.
      *
      * @param {Contracts.FieldsToEvaluate} ruleEngineInput
      * @return IPromise<void>
      */
     evaluateRulesOnField(ruleEngineInput: Contracts.FieldsToEvaluate): IPromise<void>;
     /**
-     * Returns a single update for a work item
+     * [Preview API] Returns a single update for a work item
      *
      * @param {number} id
      * @param {number} updateNumber
@@ -21720,7 +24944,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getUpdate(id: number, updateNumber: number): IPromise<Contracts.WorkItemUpdate>;
     /**
-     * Returns a the deltas between work item revisions
+     * [Preview API] Returns a the deltas between work item revisions
      *
      * @param {number} id
      * @param {number} top
@@ -21729,7 +24953,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getUpdates(id: number, top?: number, skip?: number): IPromise<Contracts.WorkItemUpdate[]>;
     /**
-     * Gets the results of the query.
+     * [Preview API] Gets the results of the query.
      *
      * @param {Contracts.Wiql} wiql - The query containing the wiql.
      * @param {string} project - Project ID or project name
@@ -21737,7 +24961,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     queryByWiql(wiql: Contracts.Wiql, project?: string): IPromise<Contracts.WorkItemQueryResult>;
     /**
-     * Gets the results of the query by id.
+     * [Preview API] Gets the results of the query by id.
      *
      * @param {string} id - The query id.
      * @param {string} project - Project ID or project name
@@ -21745,18 +24969,46 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     queryById(id: string, project?: string): IPromise<Contracts.WorkItemQueryResult>;
     /**
-     * Gets the work item relation types.
+     * [Preview API]
+     *
+     * @param {string} project - Project ID or project name
+     * @param {number} watermark
+     * @return IPromise<Contracts.ReportingWorkItemLinksBatch>
+     */
+    getReportingLinks(project?: string, watermark?: number): IPromise<Contracts.ReportingWorkItemLinksBatch>;
+    /**
+     * [Preview API] Gets the work item relation types.
      *
      * @param {string} relation
      * @return IPromise<Contracts.WorkItemRelationType>
      */
     getRelationType(relation: string): IPromise<Contracts.WorkItemRelationType>;
     /**
+     * [Preview API]
+     *
      * @return IPromise<Contracts.WorkItemRelationType[]>
      */
     getRelationTypes(): IPromise<Contracts.WorkItemRelationType[]>;
     /**
-     * Returns a single work item
+     * [Preview API]
+     *
+     * @param {string} project - Project ID or project name
+     * @param {string[]} fields
+     * @param {number} watermark
+     * @return IPromise<Contracts.ReportingWorkItemRevisionsBatch>
+     */
+    readReportingRevisionsGet(project?: string, fields?: string[], watermark?: number): IPromise<Contracts.ReportingWorkItemRevisionsBatch>;
+    /**
+     * [Preview API]
+     *
+     * @param {string[]} fieldsList
+     * @param {string} project - Project ID or project name
+     * @param {number} watermark
+     * @return IPromise<Contracts.ReportingWorkItemRevisionsBatch>
+     */
+    readReportingRevisionsPost(fieldsList: string[], project?: string, watermark?: number): IPromise<Contracts.ReportingWorkItemRevisionsBatch>;
+    /**
+     * [Preview API] Returns a single work item
      *
      * @param {number} id
      * @param {string[]} fields
@@ -21766,7 +25018,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getWorkItem(id: number, fields?: string[], asOf?: Date, expand?: Contracts.WorkItemExpand): IPromise<Contracts.WorkItem>;
     /**
-     * Returns a list of work items
+     * [Preview API] Returns a list of work items
      *
      * @param {number[]} ids
      * @param {string[]} fields
@@ -21776,6 +25028,8 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getWorkItems(ids: number[], fields?: string[], asOf?: Date, expand?: Contracts.WorkItemExpand): IPromise<Contracts.WorkItem[]>;
     /**
+     * [Preview API]
+     *
      * @param {VSS_Common_Contracts.JsonPatchDocument} document
      * @param {number} id
      * @param {boolean} validateOnly
@@ -21784,7 +25038,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateWorkItem(document: VSS_Common_Contracts.JsonPatchDocument, id: number, validateOnly?: boolean, bypassRules?: boolean): IPromise<Contracts.WorkItem>;
     /**
-     * Returns a single work item from a template
+     * [Preview API] Returns a single work item from a template
      *
      * @param {string} project - Project ID or project name
      * @param {string} type
@@ -21795,6 +25049,8 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getWorkItemTemplate(project: string, type: string, fields?: string, asOf?: Date, expand?: Contracts.WorkItemExpand): IPromise<Contracts.WorkItem>;
     /**
+     * [Preview API]
+     *
      * @param {VSS_Common_Contracts.JsonPatchDocument} document
      * @param {string} project - Project ID or project name
      * @param {string} type
@@ -21804,12 +25060,14 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateWorkItemTemplate(document: VSS_Common_Contracts.JsonPatchDocument, project: string, type: string, validateOnly?: boolean, bypassRules?: boolean): IPromise<Contracts.WorkItem>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @return IPromise<Contracts.WorkItemTypeCategory[]>
      */
     getWorkItemTypeCategories(project: string): IPromise<Contracts.WorkItemTypeCategory[]>;
     /**
-     * Returns a the deltas between work item revisions
+     * [Preview API] Returns a the deltas between work item revisions
      *
      * @param {string} project - Project ID or project name
      * @param {string} category
@@ -21817,7 +25075,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getWorkItemTypeCategory(project: string, category: string): IPromise<Contracts.WorkItemTypeCategory>;
     /**
-     * Returns a the deltas between work item revisions
+     * [Preview API] Returns a the deltas between work item revisions
      *
      * @param {string} project - Project ID or project name
      * @param {string} type
@@ -21825,12 +25083,14 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getWorkItemType(project: string, type: string): IPromise<Contracts.WorkItemType>;
     /**
+     * [Preview API]
+     *
      * @param {string} project - Project ID or project name
      * @return IPromise<Contracts.WorkItemType[]>
      */
     getWorkItemTypes(project: string): IPromise<Contracts.WorkItemType[]>;
     /**
-     * Returns the dependent fields for the corresponding workitem type and fieldname
+     * [Preview API] Returns the dependent fields for the corresponding workitem type and fieldname
      *
      * @param {string} project - Project ID or project name
      * @param {string} type
@@ -21839,7 +25099,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getDependentFields(project: string, type: string, field: string): IPromise<Contracts.FieldDependentRule>;
     /**
-     * Export work item type
+     * [Preview API] Export work item type
      *
      * @param {string} project - Project ID or project name
      * @param {string} type
@@ -21848,7 +25108,7 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
      */
     exportWorkItemTypeDefinition(project?: string, type?: string, exportGlobalLists?: boolean): IPromise<Contracts.WorkItemTypeTemplate>;
     /**
-     * Add/updates a work item type
+     * [Preview API] Add/updates a work item type
      *
      * @param {Contracts.WorkItemTypeTemplateUpdateModel} updateModel
      * @param {string} project - Project ID or project name
@@ -21857,11 +25117,30 @@ export class WorkItemTrackingHttpClient extends VSS_WebApi.VssHttpClient {
     updateWorkItemTypeDefinition(updateModel: Contracts.WorkItemTypeTemplateUpdateModel, project?: string): IPromise<Contracts.ProvisioningResult>;
 }
 }
+declare module "TFS/WorkItemTracking/UIContracts" {
+import WitContracts = require("TFS/WorkItemTracking/Contracts");
+/**
+ * A query result in the WIT UI
+ */
+export interface QueryResultWorkItemContext {
+    columns: string[];
+    rows: any[];
+    query: WitContracts.QueryHierarchyItem;
+}
+/**
+ * A work item query in the WIT UI
+ */
+export interface WorkItemQueryContext {
+    query: WitContracts.QueryHierarchyItem;
+}
+}
 declare module "TFS/Work/Contracts" {
 import System_Contracts = require("VSS/Common/Contracts/System");
 export interface Activity {
     capacityPerDay: number;
     name: string;
+}
+export interface attribute {
 }
 export interface Board extends ShallowReference {
     _links: any;
@@ -21876,29 +25155,36 @@ export interface Board extends ShallowReference {
     revision: number;
     rows: BoardRow[];
 }
+export interface BoardCardRuleSettings {
+    _links: any;
+    rules: Rule[];
+    url: string;
+}
 export interface BoardCardSettings {
-    value: CardTypeSetting[];
+    cards: {
+        [key: string]: FieldSetting[];
+    };
 }
 export interface BoardChart extends BoardChartReference {
     /**
-    * The links for the resource
-    */
+     * The links for the resource
+     */
     _links: any;
     /**
-    * The settings for the resource
-    */
+     * The settings for the resource
+     */
     settings: {
         [key: string]: any;
     };
 }
 export interface BoardChartReference {
     /**
-    * Name of the resource
-    */
+     * Name of the resource
+     */
     name: string;
     /**
-    * Full http link to the resource
-    */
+     * Full http link to the resource
+     */
     url: string;
 }
 export interface BoardColumn {
@@ -21929,43 +25215,33 @@ export enum BugsBehavior {
     AsTasks = 2,
 }
 /**
-* Collection of MemberCapacities
-*/
-export interface Capacities extends TeamSettingsDataContractBase {
-    values: TeamMemberCapacity[];
-}
-/**
-* Expected data from PATCH
-*/
+ * Expected data from PATCH
+ */
 export interface CapacityPatch {
     activities: Activity[];
     daysOff: DateRange[];
 }
-export interface CardTypeSetting {
-    fields: FieldSetting[];
-    type: string;
-}
 export interface DateRange {
     /**
-    * End of the date range.
-    */
+     * End of the date range.
+     */
     end: Date;
     /**
-    * Start of the date range.
-    */
+     * Start of the date range.
+     */
     start: Date;
 }
 /**
-* An abstracted reference to a field
-*/
+ * An abstracted reference to a field
+ */
 export interface FieldReference {
     /**
-    * fieldRefName for the field
-    */
+     * fieldRefName for the field
+     */
     referenceName: string;
     /**
-    * Full http link to more information about the field
-    */
+     * Full http link to more information about the field
+     */
     url: string;
 }
 export interface FieldSetting {
@@ -21977,50 +25253,57 @@ export interface Member {
     uniqueName: string;
     url: string;
 }
+export interface Rule {
+    filter: string;
+    isEnabled: string;
+    name: string;
+    settings: attribute;
+    type: string;
+}
 /**
-* An abstracted reference to some other resource. This class is used to provide the board data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
-*/
+ * An abstracted reference to some other resource. This class is used to provide the board data contracts with a uniform way to reference other resources in a way that provides easy traversal through links.
+ */
 export interface ShallowReference {
     /**
-    * Id of the resource
-    */
+     * Id of the resource
+     */
     id: string;
     /**
-    * Name of the resource
-    */
+     * Name of the resource
+     */
     name: string;
     /**
-    * Full http link to the resource
-    */
+     * Full http link to the resource
+     */
     url: string;
 }
 /**
-* Represents a single TeamFieldValue
-*/
+ * Represents a single TeamFieldValue
+ */
 export interface TeamFieldValue {
     includeChildren: boolean;
     value: string;
 }
 /**
-* Essentially a collection of tem field values
-*/
+ * Essentially a collection of tem field values
+ */
 export interface TeamFieldValues extends TeamSettingsDataContractBase {
     /**
-    * The default team field value
-    */
+     * The default team field value
+     */
     defaultValue: string;
     /**
-    * Shallow ref to the field being used as a team field
-    */
+     * Shallow ref to the field being used as a team field
+     */
     field: FieldReference;
     /**
-    * Collection of all valid team field values
-    */
+     * Collection of all valid team field values
+     */
     values: TeamFieldValue[];
 }
 /**
-* Expected data from PATCH
-*/
+ * Expected data from PATCH
+ */
 export interface TeamFieldValuesPatch {
     defaultValue: string;
     values: TeamFieldValue[];
@@ -22030,56 +25313,56 @@ export interface TeamIterationAttributes {
     startDate: Date;
 }
 /**
-* Represents capacity for a specific team member
-*/
+ * Represents capacity for a specific team member
+ */
 export interface TeamMemberCapacity extends TeamSettingsDataContractBase {
     /**
-    * Collection of capacities associated with the team member
-    */
+     * Collection of capacities associated with the team member
+     */
     activities: Activity[];
     /**
-    * The days off associated with the team member
-    */
+     * The days off associated with the team member
+     */
     daysOff: DateRange[];
     /**
-    * Shallow Ref to the associated team member
-    */
+     * Shallow Ref to the associated team member
+     */
     teamMember: Member;
 }
 /**
-* Data contract for TeamSettings
-*/
+ * Data contract for TeamSettings
+ */
 export interface TeamSetting extends TeamSettingsDataContractBase {
     /**
-    * Default Iteration
-    */
+     * Default Iteration
+     */
     backlogIteration: TeamSettingsIteration;
     /**
-    * Information about categories that are visible on the backlog.
-    */
+     * Information about categories that are visible on the backlog.
+     */
     backlogVisibilities: {
         [key: string]: boolean;
     };
     /**
-    * BugsBehavior (Off, AsTasks, AsRequirements, ...)
-    */
+     * BugsBehavior (Off, AsTasks, AsRequirements, ...)
+     */
     bugsBehavior: BugsBehavior;
     /**
-    * Days that the team is working
-    */
+     * Days that the team is working
+     */
     workingDays: System_Contracts.DayOfWeek[];
 }
 /**
-* Base class for TeamSettings data contracts. Anything common goes here.
-*/
+ * Base class for TeamSettings data contracts. Anything common goes here.
+ */
 export interface TeamSettingsDataContractBase {
     /**
-    * Collection of links relevant to resource
-    */
+     * Collection of links relevant to resource
+     */
     _links: any;
     /**
-    * Full http link to the resource
-    */
+     * Full http link to the resource
+     */
     url: string;
 }
 export interface TeamSettingsDaysOff extends TeamSettingsDataContractBase {
@@ -22089,32 +25372,29 @@ export interface TeamSettingsDaysOffPatch {
     daysOff: DateRange[];
 }
 /**
-* Represents a shallow ref for a single iteration
-*/
+ * Represents a shallow ref for a single iteration
+ */
 export interface TeamSettingsIteration extends TeamSettingsDataContractBase {
     /**
-    * Attributes such as start and end date
-    */
+     * Attributes such as start and end date
+     */
     attributes: TeamIterationAttributes;
     /**
-    * Id of the resource
-    */
+     * Id of the resource
+     */
     id: string;
     /**
-    * Name of the resource
-    */
+     * Name of the resource
+     */
     name: string;
     /**
-    * Relative path of the iteration
-    */
+     * Relative path of the iteration
+     */
     path: string;
 }
-export interface TeamSettingsIterations extends TeamSettingsDataContractBase {
-    values: TeamSettingsIteration[];
-}
 /**
-* Data contract for what we expect to receive when PATCH
-*/
+ * Data contract for what we expect to receive when PATCH
+ */
 export interface TeamSettingsPatch {
     backlogIteration: string;
     backlogVisibilities: {
@@ -22127,7 +25407,13 @@ export var TypeInfo: {
     Activity: {
         fields: any;
     };
+    attribute: {
+        fields: any;
+    };
     Board: {
+        fields: any;
+    };
+    BoardCardRuleSettings: {
         fields: any;
     };
     BoardCardSettings: {
@@ -22162,13 +25448,7 @@ export var TypeInfo: {
             "asTasks": number;
         };
     };
-    Capacities: {
-        fields: any;
-    };
     CapacityPatch: {
-        fields: any;
-    };
-    CardTypeSetting: {
         fields: any;
     };
     DateRange: {
@@ -22181,6 +25461,9 @@ export var TypeInfo: {
         fields: any;
     };
     Member: {
+        fields: any;
+    };
+    Rule: {
         fields: any;
     };
     ShallowReference: {
@@ -22216,9 +25499,6 @@ export var TypeInfo: {
     TeamSettingsIteration: {
         fields: any;
     };
-    TeamSettingsIterations: {
-        fields: any;
-    };
     TeamSettingsPatch: {
         fields: any;
     };
@@ -22232,25 +25512,31 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
     static serviceInstanceId: string;
     constructor(rootRequestPath: string);
     /**
-     * Get board API
+     * [Preview API] Get board API
      *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
-     * @param {string} id - Identifier for board, either category plural name (Eg:&quot;Stories&quot;) or Guid
+     * @param {string} id - Identifier for board, either category plural name (Eg:"Stories") or Guid
      * @return IPromise<Contracts.Board>
      */
     getBoard(teamContext: TFS_Core_Contracts.TeamContext, id: string): IPromise<Contracts.Board>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @return IPromise<Contracts.BoardReference[]>
      */
     getBoards(teamContext: TFS_Core_Contracts.TeamContext): IPromise<Contracts.BoardReference[]>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} iterationId
-     * @return IPromise<Contracts.Capacities>
+     * @return IPromise<Contracts.TeamMemberCapacity[]>
      */
-    getCapacities(teamContext: TFS_Core_Contracts.TeamContext, iterationId: string): IPromise<Contracts.Capacities>;
+    getCapacities(teamContext: TFS_Core_Contracts.TeamContext, iterationId: string): IPromise<Contracts.TeamMemberCapacity[]>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} iterationId
      * @param {string} teamMemberId
@@ -22258,6 +25544,17 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getCapacity(teamContext: TFS_Core_Contracts.TeamContext, iterationId: string, teamMemberId: string): IPromise<Contracts.TeamMemberCapacity>;
     /**
+     * [Preview API]
+     *
+     * @param {Contracts.TeamMemberCapacity[]} capacities
+     * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
+     * @param {string} iterationId
+     * @return IPromise<Contracts.TeamMemberCapacity[]>
+     */
+    replaceCapacities(capacities: Contracts.TeamMemberCapacity[], teamContext: TFS_Core_Contracts.TeamContext, iterationId: string): IPromise<Contracts.TeamMemberCapacity[]>;
+    /**
+     * [Preview API]
+     *
      * @param {Contracts.CapacityPatch} patch
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} iterationId
@@ -22266,7 +25563,24 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateCapacity(patch: Contracts.CapacityPatch, teamContext: TFS_Core_Contracts.TeamContext, iterationId: string, teamMemberId: string): IPromise<Contracts.TeamMemberCapacity>;
     /**
-     * Get board card settings for the board id or board by name
+     * [Preview API] Get board card Rule settings for the board id or board by name
+     *
+     * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
+     * @param {string} board
+     * @return IPromise<Contracts.BoardCardRuleSettings>
+     */
+    getBoardCardRuleSettings(teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardCardRuleSettings>;
+    /**
+     * [Preview API] Update board card Rule settings for the board id or board by name
+     *
+     * @param {Contracts.BoardCardRuleSettings} boardCardRuleSettings
+     * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
+     * @param {string} board
+     * @return IPromise<Contracts.BoardCardRuleSettings>
+     */
+    updateBoardCardRuleSettings(boardCardRuleSettings: Contracts.BoardCardRuleSettings, teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardCardRuleSettings>;
+    /**
+     * [Preview API] Get board card settings for the board id or board by name
      *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} board
@@ -22274,7 +25588,7 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
      */
     getBoardCardSettings(teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardCardSettings>;
     /**
-     * Update board card settings for the board id or board by name
+     * [Preview API] Update board card settings for the board id or board by name
      *
      * @param {Contracts.BoardCardSettings} boardCardSettingsToSave
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
@@ -22283,41 +25597,43 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateBoardCardSettings(boardCardSettingsToSave: Contracts.BoardCardSettings, teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardCardSettings>;
     /**
-     * Get a board chart
+     * [Preview API] Get a board chart
      *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
-     * @param {string} board - Identifier for board, either category plural name (Eg:&quot;Stories&quot;) or Guid
+     * @param {string} board - Identifier for board, either category plural name (Eg:"Stories") or Guid
      * @param {string} name - The chart name
      * @return IPromise<Contracts.BoardChart>
      */
     getBoardChart(teamContext: TFS_Core_Contracts.TeamContext, board: string, name: string): IPromise<Contracts.BoardChart>;
     /**
-     * Get board charts
+     * [Preview API] Get board charts
      *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
-     * @param {string} board - Identifier for board, either category plural name (Eg:&quot;Stories&quot;) or Guid
+     * @param {string} board - Identifier for board, either category plural name (Eg:"Stories") or Guid
      * @return IPromise<Contracts.BoardChartReference[]>
      */
     getBoardCharts(teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardChartReference[]>;
     /**
-     * Update a board chart
+     * [Preview API] Update a board chart
      *
-     * @param {{ [key: string] : any; }} settings - The settings to to be updated for the chart
+     * @param {Contracts.BoardChart} chart
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
-     * @param {string} board - Identifier for board, either category plural name (Eg:&quot;Stories&quot;) or Guid
+     * @param {string} board - Identifier for board, either category plural name (Eg:"Stories") or Guid
      * @param {string} name - The chart name
      * @return IPromise<Contracts.BoardChart>
      */
-    updateBoardChart(settings: {
-        [key: string]: any;
-    }, teamContext: TFS_Core_Contracts.TeamContext, board: string, name: string): IPromise<Contracts.BoardChart>;
+    updateBoardChart(chart: Contracts.BoardChart, teamContext: TFS_Core_Contracts.TeamContext, board: string, name: string): IPromise<Contracts.BoardChart>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} board
      * @return IPromise<Contracts.BoardColumn[]>
      */
     getBoardColumns(teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardColumn[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.BoardColumn[]} boardColumns
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} board
@@ -22325,36 +25641,48 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateBoardColumns(boardColumns: Contracts.BoardColumn[], teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardColumn[]>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} id
      * @return IPromise<void>
      */
     deleteTeamIteration(teamContext: TFS_Core_Contracts.TeamContext, id: string): IPromise<void>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} id
      * @return IPromise<Contracts.TeamSettingsIteration>
      */
     getTeamIteration(teamContext: TFS_Core_Contracts.TeamContext, id: string): IPromise<Contracts.TeamSettingsIteration>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} timeframe
-     * @return IPromise<Contracts.TeamSettingsIterations>
+     * @return IPromise<Contracts.TeamSettingsIteration[]>
      */
-    getTeamIterations(teamContext: TFS_Core_Contracts.TeamContext, timeframe?: string): IPromise<Contracts.TeamSettingsIterations>;
+    getTeamIterations(teamContext: TFS_Core_Contracts.TeamContext, timeframe?: string): IPromise<Contracts.TeamSettingsIteration[]>;
     /**
-     * @param {string} iterationId
+     * [Preview API]
+     *
+     * @param {Contracts.TeamSettingsIteration} iteration
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @return IPromise<Contracts.TeamSettingsIteration>
      */
-    postTeamIteration(iterationId: string, teamContext: TFS_Core_Contracts.TeamContext): IPromise<Contracts.TeamSettingsIteration>;
+    postTeamIteration(iteration: Contracts.TeamSettingsIteration, teamContext: TFS_Core_Contracts.TeamContext): IPromise<Contracts.TeamSettingsIteration>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} board
      * @return IPromise<Contracts.BoardRow[]>
      */
     getBoardRows(teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardRow[]>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.BoardRow[]} boardRows
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} board
@@ -22362,12 +25690,16 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateBoardRows(boardRows: Contracts.BoardRow[], teamContext: TFS_Core_Contracts.TeamContext, board: string): IPromise<Contracts.BoardRow[]>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} iterationId
      * @return IPromise<Contracts.TeamSettingsDaysOff>
      */
     getTeamDaysOff(teamContext: TFS_Core_Contracts.TeamContext, iterationId: string): IPromise<Contracts.TeamSettingsDaysOff>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TeamSettingsDaysOffPatch} daysOffPatch
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @param {string} iterationId
@@ -22375,22 +25707,30 @@ export class WorkHttpClient extends VSS_WebApi.VssHttpClient {
      */
     updateTeamDaysOff(daysOffPatch: Contracts.TeamSettingsDaysOffPatch, teamContext: TFS_Core_Contracts.TeamContext, iterationId: string): IPromise<Contracts.TeamSettingsDaysOff>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @return IPromise<Contracts.TeamFieldValues>
      */
     getTeamFieldValues(teamContext: TFS_Core_Contracts.TeamContext): IPromise<Contracts.TeamFieldValues>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TeamFieldValuesPatch} patch
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @return IPromise<Contracts.TeamFieldValues>
      */
     updateTeamFieldValues(patch: Contracts.TeamFieldValuesPatch, teamContext: TFS_Core_Contracts.TeamContext): IPromise<Contracts.TeamFieldValues>;
     /**
+     * [Preview API]
+     *
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @return IPromise<Contracts.TeamSetting>
      */
     getTeamSettings(teamContext: TFS_Core_Contracts.TeamContext): IPromise<Contracts.TeamSetting>;
     /**
+     * [Preview API]
+     *
      * @param {Contracts.TeamSettingsPatch} teamSettingsPatch
      * @param {TFS_Core_Contracts.TeamContext} teamContext - The team context for the operation
      * @return IPromise<Contracts.TeamSetting>

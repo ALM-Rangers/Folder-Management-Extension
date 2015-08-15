@@ -17,6 +17,8 @@ class TFVCFolderManager extends FolderManager implements IFolderManager {
     }
 
     public dialogCallback: (result: IFormInput) => void = (result) => {
+        var self = this;
+
         VSS.require(["VSS/Authentication/Services"],(service) => {
             var authTokenManager = service.authTokenManager;
             authTokenManager.getToken().then((token) => {
@@ -25,8 +27,7 @@ class TFVCFolderManager extends FolderManager implements IFolderManager {
                     headers: { 'Authorization': header }
                 });
 
-                var path = this.actionContext.serverItem ?
-                    this.actionContext.serverItem : this.actionContext.path;
+                var path = self.actionContext.item.path;
                 path += "/" + result.folderName;
 
                 var vsoContext = VSS.getWebContext();

@@ -26,7 +26,11 @@
     <script src="scripts/TFVCFolderManager.js"></script>
     <script src="scripts/main.js"></script>
     <script>
-        VSS.init({ setupModuleLoader: true });
+        VSS.init({
+            setupModuleLoader: true,
+            usePlatformScripts: true,
+            usePlatformStyles: true
+        });
     </script>
 </body>
 </html>

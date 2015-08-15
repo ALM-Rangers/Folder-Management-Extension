@@ -47,14 +47,19 @@ class GitFolderManager extends FolderManager implements IFolderManager {
     }
 
     public dialogCallback: (result: IFormInput) => void = (result) => {
+        var actionContext = this.actionContext;
+
+
         var folderName = result.folderName;
         var placeHolderFileName = result.placeHolderFileName;
-        var repositoryId = this.actionContext.repositoryId;
-        var branchName = this.actionContext.version.branchName;
-        var basePath = this.actionContext.serverItem ? this.actionContext.serverItem : "";
+        var repositoryId = actionContext.gitRepository.id;
+        var branchName = actionContext.version;
+        var basePath = this.actionContext.item ? this.actionContext.item.path : "";
         var comment = result.comment;
 
-        VSS.require(["VSS/Authentication/Services"],(service) => {
+        VSS.require(["VSS/Authentication/Services"], (service) => {
+            var self = this;
+
             var authTokenManager = service.authTokenManager;
             authTokenManager.getToken().then((token) => {
                 var header = authTokenManager.getAuthorizationHeader(token);
@@ -72,6 +77,8 @@ class GitFolderManager extends FolderManager implements IFolderManager {
                 });
 
                 $.ajax(getItemsRequestUri).then((result) => {
+
+                    // check and see if the folder already exists
                     var folderPath = basePath ? basePath + "/" + folderName : folderName;
                     for (var i = 0; i < result.value.length; i++) {
                         var current = result.value[i];
@@ -90,7 +97,15 @@ class GitFolderManager extends FolderManager implements IFolderManager {
                                 url: postCommitRequestUri,
                                 data: JSON.stringify(data),
                                 contentType: "application/json"
-                            }).then(this.refreshBrowserWindow)
+                            }).then(
+
+                                function () {
+                                    self.refreshBrowserWindow();
+                                },
+                                function (x, y, z) {
+                                    alert("Couldn't commit new folder: " + y);
+                                }
+                            );
                         });
                 });
             });

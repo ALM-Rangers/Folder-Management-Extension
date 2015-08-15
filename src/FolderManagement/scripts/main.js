@@ -10,51 +10,42 @@
 // TypeScript class that adds the menu action and shows the dialog.
 // </summary>
 //---------------------------------------------------------------------
-
 /// <reference path='ref/VSS.d.ts' />
-
-class AddFolderMenu {
-    private actionContext;
-
-    public execute(actionContext) {
+var AddFolderMenu = (function () {
+    function AddFolderMenu() {
+    }
+    AddFolderMenu.prototype.execute = function (actionContext) {
         this.actionContext = actionContext;
         this.showDialog();
-    }
-
-    private getSourceControlType() {
+    };
+    AddFolderMenu.prototype.getSourceControlType = function () {
         var sourceControlType = "TFVC";
-
         if (this.actionContext.gitRepository) {
             sourceControlType = "Git";
         }
-
         return sourceControlType;
-    }
-
-    private showDialog() {
-        VSS.getService("ms.vss-web.dialog-service").then((dialogSvc: IHostDialogService) => {
+    };
+    AddFolderMenu.prototype.showDialog = function () {
+        var _this = this;
+        VSS.getService("ms.vss-web.dialog-service").then(function (dialogSvc) {
             var createNewFolderDialog;
-            var sourceControlType = this.getSourceControlType();
-
+            var sourceControlType = _this.getSourceControlType();
             // contribution info
             var extInfo = VSS.getExtensionContext();
             var dialogContributionId = extInfo.publisherId + "." + extInfo.extensionId + "." + "createNewFolderDialog";
-
             //var controlContributionInfo: IContribution = {
             //    id: "createNewFolderDialog",
             //    extensionId: VSS.getExtensionContext().id,
             //    pointId: VSS.getExtensionContext().namespace + "#dialog"
             //};
-
             var callBack;
             if (sourceControlType == "Git") {
-                callBack = new GitFolderManager(this.actionContext).dialogCallback;
+                callBack = new GitFolderManager(_this.actionContext).dialogCallback;
             }
             else {
-                callBack = new TFVCFolderManager(this.actionContext).dialogCallback;
+                callBack = new TFVCFolderManager(_this.actionContext).dialogCallback;
             }
-
-            var dialogOptions: IHostDialogOptions = {
+            var dialogOptions = {
                 title: "Create new folder",
                 draggable: true,
                 modal: true,
@@ -63,33 +54,29 @@ class AddFolderMenu {
                 okCallback: callBack,
                 getDialogResult: function () {
                     return createNewFolderDialog ? createNewFolderDialog.getFormInputs() : null;
-                },
+                }
             };
-
-            dialogSvc.openDialog(dialogContributionId, dialogOptions).then((dialog) => {
-                dialog.getContributionInstance("createNewFolderDialog").then((createNewFolderDialogInstance) => {
+            dialogSvc.openDialog(dialogContributionId, dialogOptions).then(function (dialog) {
+                dialog.getContributionInstance("createNewFolderDialog").then(function (createNewFolderDialogInstance) {
                     createNewFolderDialog = createNewFolderDialogInstance;
                     createNewFolderDialog.setVersionControl(sourceControlType);
-
-                    var path = this.actionContext.serverItem ?
-                        this.actionContext.serverItem : this.actionContext.path;
-
+                    var path = _this.actionContext.serverItem ?
+                        _this.actionContext.serverItem : _this.actionContext.path;
                     if (sourceControlType == "Git") {
-                        path = this.actionContext.repositoryName + path;
+                        path = _this.actionContext.repositoryName + path;
                     }
-
                     createNewFolderDialog.setCurrentPath(path);
                     createNewFolderDialog.onStateChanged(function (isValid) {
                         dialog.updateOkButton(isValid);
                     });
-
                     dialog.updateOkButton(true);
                 });
-            })
-        })
-    }
-}
-
+            });
+        });
+    };
+    return AddFolderMenu;
+})();
 VSS.register("addFolder", function (context) {
     return new AddFolderMenu();
 });
+//# sourceMappingURL=main.js.map
