@@ -1,8 +1,8 @@
 {
     "manifestVersion": 1,
     "id": null,
-    "version": "1.0.0",
-    "publisher": "abelsquidhead",
+    "version": "1.0.1",
+    "publisher": "alm-rangers",
     "extensionId": "almrangers-vsoextensions-FolderManagement",
     "name": "Folder Management",
     "description": "An extension for Visual Studio Online that adds the ability to create new folders directly from web access in the code view",

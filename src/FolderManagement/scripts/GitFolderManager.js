@@ -22,49 +22,32 @@ var GitFolderManager = (function (_super) {
         var _this = this;
         _super.call(this, actionContext);
         this.dialogCallback = function (result) {
-            var actionContext = _this.actionContext;
+            var self = _this;
+            var actionContext = self.actionContext;
             var folderName = result.folderName;
             var placeHolderFileName = result.placeHolderFileName;
             var repositoryId = actionContext.gitRepository.id;
             var branchName = actionContext.version;
-            var basePath = _this.actionContext.item ? _this.actionContext.item.path : "";
+            var basePath = self.actionContext.item ? self.actionContext.item.path : "";
             var comment = result.comment;
-            VSS.require(["VSS/Authentication/Services"], function (service) {
-                var self = _this;
-                var authTokenManager = service.authTokenManager;
-                authTokenManager.getToken().then(function (token) {
-                    var header = authTokenManager.getAuthorizationHeader(token);
-                    var vsoContext = VSS.getWebContext();
-                    var collectionUri = vsoContext.collection.uri;
-                    var gitApiUri = collectionUri + "_apis/git/repositories/" + repositoryId + "/";
-                    var getCommitRequestUri = gitApiUri + "commits?api-version=1.0";
-                    var postCommitRequestUri = gitApiUri + "pushes?api-version=2.0-preview";
-                    var getItemsRequestUri = gitApiUri + "items?api-version=1.0&includeContentMetadata=true&recursionLevel=Full&scopePath=" + basePath;
-                    $.ajaxSetup({
-                        headers: { 'Authorization': header }
-                    });
-                    $.ajax(getItemsRequestUri).then(function (result) {
-                        // check and see if the folder already exists
-                        var folderPath = basePath ? basePath + "/" + folderName : folderName;
-                        for (var i = 0; i < result.value.length; i++) {
-                            var current = result.value[i];
-                            if (current.isFolder && current.path.indexOf(folderPath) === 0) {
-                                return;
-                            }
+            VSS.require(["VSS/Service", "TFS/VersionControl/GitRestClient", "TFS/VersionControl/Contracts"], function (Service, RestClient, Contracts) {
+                var gitClient = Service.getClient(RestClient.GitHttpClient);
+                gitClient.getItems(repositoryId, undefined, basePath, Contracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(function (result) {
+                    // check and see if the folder already exists
+                    var folderPath = basePath ? basePath + "/" + folderName : folderName;
+                    for (var i = 0; i < result.length; i++) {
+                        var current = result[i];
+                        if (current.isFolder && current.path.indexOf(folderPath) === 0) {
+                            return;
                         }
-                        $.ajax(getCommitRequestUri).then(function (result) {
-                            var oldCommitId = result.value[0].commitId;
-                            var data = _this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
-                            $.ajax({
-                                type: "POST",
-                                url: postCommitRequestUri,
-                                data: JSON.stringify(data),
-                                contentType: "application/json"
-                            }).then(function () {
-                                self.refreshBrowserWindow();
-                            }, function (x, y, z) {
-                                alert("Couldn't commit new folder: " + y);
-                            });
+                    }
+                    // folder doesn't exist, create it
+                    gitClient.getCommits(repositoryId, { $top: 1 }, undefined, undefined, undefined).then(function (commits) {
+                        var oldCommitId = commits[0].commitId;
+                        var data = self.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+                        gitClient.createPush(data, repositoryId, undefined).then(function () {
+                            self.refreshBrowserWindow();
+                        }, function (x, y, z) {
                         });
                     });
                 });

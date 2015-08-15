@@ -19,55 +19,48 @@ class TFVCFolderManager extends FolderManager implements IFolderManager {
     public dialogCallback: (result: IFormInput) => void = (result) => {
         var self = this;
 
-        VSS.require(["VSS/Authentication/Services"],(service) => {
-            var authTokenManager = service.authTokenManager;
-            authTokenManager.getToken().then((token) => {
-                var header = authTokenManager.getAuthorizationHeader(token);
-                $.ajaxSetup({
-                    headers: { 'Authorization': header }
-                });
+        VSS.require(["VSS/Service", "TFS/VersionControl/TfvcRestClient", "TFS/VersionControl/Contracts"], (Service, RestClient, Contracts) => {
+            var tfvcClient = Service.getClient(RestClient.TfvcHttpClient);
 
-                var path = self.actionContext.item.path;
-                path += "/" + result.folderName;
+            var path = self.actionContext.item.path;
+            path += "/" + result.folderName;
+            var vsoContext = VSS.getWebContext();
 
-                var vsoContext = VSS.getWebContext();
-                var collectionUri = vsoContext.collection.uri;
-                var tfvcChangesetApiUri = collectionUri + "_apis/tfvc/changesets?api-version=2.0-preview";
-                var tfvcItemsApiUri = collectionUri + "_apis/tfvc/items?api-version=1.0-preview&recursionLevel=OneLevel&scopePath=" + path;
+            tfvcClient.getItem(undefined, undefined, undefined,
+                undefined, path, Contracts.VersionControlRecursionType.OneLevel,
+                undefined).then(
 
-                $.ajax(tfvcItemsApiUri).then((changesets) => {
-
-                    for (var i = 0; i < changesets.value.length; i++) {
-                        var current = changesets.value[i];
-                        if (current.isFolder && current.path.indexOf(path) === 0) {
-                            return;
+                    function (itemsMetaData) {
+                        // check and see if folder already exists, if it does, just return out of here
+                        for (var i = 0; i < itemsMetaData.value.length; i++) {
+                            var current = itemsMetaData.value[i];
+                            if (current.isFolder && current.path.indexOf(path) === 0) {
+                                return;
+                            }
                         }
-                    }
 
-                    var data = {
-                        comment: result.comment,
-                        changes: [
-                            {
-                                changeType: 1,
-                                item: {
-                                    path: path + "/" + result.placeHolderFileName,
-                                    contentMetadata: { encoding: 65001 },
-                                },
-                                newContent: {
-                                    content: "Placeholder file for new folder",
-                                    contentType: 0
-                                }
-                            }]
-                    };
+                        // folder doesn't exist, go and create one
+                        var data = {
+                            comment: result.comment,
+                            changes: [
+                                {
+                                    changeType: 1,
+                                    item: {
+                                        path: path + "/" + result.placeHolderFileName,
+                                        contentMetadata: { encoding: 65001 },
+                                    },
+                                    newContent: {
+                                        content: "Placeholder file for new folder",
+                                        contentType: 0
+                                    }
+                                }]
+                        };
 
-                    $.ajax({
-                        type: "POST",
-                        url: tfvcChangesetApiUri,
-                        contentType: "application/json",
-                        data: JSON.stringify(data)
-                    }).then(this.refreshBrowserWindow);
-                });
-            });
-        })
+                        tfvcClient.createChangeset(data, undefined).then(
+                            function () {
+                                self.refreshBrowserWindow();
+                            });
+                    });
+        });
     }
 }
