@@ -6,7 +6,7 @@
     "extensionId": "almrangers-vsoextensions-FolderManagement",
     "name": "Folder Management",
     "description": "An extension for Visual Studio Online that adds the ability to create new folders directly from web access in the code view",
-    "baseUri": "https://localhost:44300/",
+    "baseUri": "https://foldermanagement-vsoextensions-almrangers.azurewebsites.net/",
     "icons": {
         "wide": "images/VSO_Folder_196x.png"
     },
