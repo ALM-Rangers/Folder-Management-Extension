@@ -24,7 +24,6 @@ Check out [Wouter de Kort's](http://blogs.msdn.com/b/willy-peter_schaub/archive/
 ![](https://github.com/ALM-Rangers/VSO-Extension-FolderManagement/blob/master/media/FolderManagementExtension_Dialog.PNG)
 
 ### M85 Changes
-VSO release M85 broke this extension in a lot of places beyond just running the migration command
 1. The services "vss.history" and "vss.dialogs" have been renamed to "ms.vss-web.navigation-service" and "ms.vss-web.dialog-service", respectively.
 2. The VSS.init() call now takes two separate properties to load in scripts and styles. Replace setupModuleLoader: true with usePlatformScripts: true or usePlatformStyles: true (or both, if necessary).
 3. The client object model changed which meant changing code to match the new object model
