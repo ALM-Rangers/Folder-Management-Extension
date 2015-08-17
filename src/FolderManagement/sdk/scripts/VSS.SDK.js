@@ -1,6 +1,3 @@
-//----------------------------------------------------------
-// Copyright (C) Microsoft Corporation. All rights reserved.
-//----------------------------------------------------------
 ///<reference path='../References/VSS-Common.d.ts' />
 ///<reference path='../References/VSS.SDK.Interfaces.d.ts' />
 ///<reference path='../References/SDK.Interfaces.d.ts' />
@@ -39,9 +36,7 @@ var XDM;
         }
         XdmDeferred.prototype._then = function (onFulfill, onReject) {
             var _this = this;
-            if ((!onFulfill && !onReject) ||
-                (this._isResolved && !onFulfill) ||
-                (this._isRejected && !onReject)) {
+            if ((!onFulfill && !onReject) || (this._isResolved && !onFulfill) || (this._isRejected && !onReject)) {
                 return this.promise;
             }
             var newDeferred = new XdmDeferred();
@@ -131,8 +126,7 @@ var XDM;
      */
     function newFingerprint() {
         // smallestRandom ensures we will get a 11-character result from the base-36 conversion.
-        return Math.floor((Math.random() * (maxSafeInteger - smallestRandom)) + smallestRandom).toString(36) +
-            Math.floor((Math.random() * (maxSafeInteger - smallestRandom)) + smallestRandom).toString(36);
+        return Math.floor((Math.random() * (maxSafeInteger - smallestRandom)) + smallestRandom).toString(36) + Math.floor((Math.random() * (maxSafeInteger - smallestRandom)) + smallestRandom).toString(36);
     }
     /**
      * Catalog of objects exposed for XDM
@@ -210,17 +204,15 @@ var XDM;
         * @param instanceId unique id of the registered object
         * @param params Arguments to the method to invoke
         * @param instanceContextData Optional context data to pass to a registered object's factory method
-        * @param serializationSettings Optional serialization settings
         */
-        XDMChannel.prototype.invokeRemoteMethod = function (methodName, instanceId, params, instanceContextData, serializationSettings) {
+        XDMChannel.prototype.invokeRemoteMethod = function (methodName, instanceId, params, instanceContextData) {
             var message = {
                 id: this._nextMessageId++,
                 methodName: methodName,
                 instanceId: instanceId,
                 instanceContext: instanceContextData,
-                params: this._customSerializeObject(params, serializationSettings),
-                jsonrpc: "2.0",
-                serializationSettings: serializationSettings
+                params: this._customSerializeObject(params),
+                jsonrpc: "2.0"
             };
             if (!this._targetOrigin) {
                 message.handshakeToken = this._handshakeToken;
@@ -361,7 +353,7 @@ var XDM;
             //  {"id": "5", "error": {"code": -32601, "message": "Method not found."}, "jsonrpc": "2.0", }
             var message = {
                 id: messageObj.id,
-                error: this._customSerializeObject([errorObj], messageObj.serializationSettings)[0],
+                error: this._customSerializeObject([errorObj])[0],
                 jsonrpc: "2.0",
                 handshakeToken: handshakeToken
             };
@@ -372,7 +364,7 @@ var XDM;
             //  {"id": "9", "result": ["hello", 5], "jsonrpc": "2.0"}
             var message = {
                 id: messageObj.id,
-                result: this._customSerializeObject([result], messageObj.serializationSettings)[0],
+                result: this._customSerializeObject([result])[0],
                 jsonrpc: "2.0",
                 handshakeToken: handshakeToken
             };
@@ -399,7 +391,7 @@ var XDM;
             }
             return false;
         };
-        XDMChannel.prototype._customSerializeObject = function (obj, settings, parentObjects, nextCircularRefId, depth) {
+        XDMChannel.prototype._customSerializeObject = function (obj, parentObjects, nextCircularRefId, depth) {
             var _this = this;
             if (parentObjects === void 0) { parentObjects = null; }
             if (nextCircularRefId === void 0) { nextCircularRefId = 1; }
@@ -451,7 +443,7 @@ var XDM;
                             };
                         }
                         else {
-                            newObject[key] = _this._customSerializeObject(item, settings, parentObjects, nextCircularRefId, depth + 1);
+                            newObject[key] = _this._customSerializeObject(item, parentObjects, nextCircularRefId, depth + 1);
                         }
                     }
                     else if (key !== "__proxyFunctionId") {
@@ -490,7 +482,7 @@ var XDM;
                 for (var i = 0, l = keys.length; i < l; i++) {
                     var key = keys[i];
                     // Don't serialize properties that start with an underscore.
-                    if ((key && key[0] !== "_") || (settings && settings.includeUnderscoreProperties)) {
+                    if (key && key[0] !== "_") {
                         serializeMember(obj, returnValue, key);
                     }
                 }
@@ -508,7 +500,6 @@ var XDM;
         };
         XDMChannel.prototype._customDeserializeObject = function (obj, circularRefs) {
             var _this = this;
-            var that = this;
             if (!obj) {
                 return null;
             }
@@ -525,7 +516,7 @@ var XDM;
                 else if (itemType === "object" && item) {
                     if (item.__proxyFunctionId) {
                         parentObject[key] = function () {
-                            return that.invokeRemoteMethod("proxy" + item.__proxyFunctionId, "__proxyFunctions", Array.prototype.slice.call(arguments, 0), null, { includeUnderscoreProperties: true });
+                            return _this.invokeRemoteMethod("proxy" + item.__proxyFunctionId, "__proxyFunctions", Array.prototype.slice.call(arguments, 0));
                         };
                     }
                     else if (item.__proxyDate) {
@@ -626,7 +617,7 @@ var XDM;
 })(XDM || (XDM = {}));
 var VSS;
 (function (VSS) {
-    VSS.VssSDKVersion = 0.1;
+    VSS.VssSDKVersion = "0.1";
     var htmlElement;
     var webContext;
     var hostPageContext;
@@ -635,32 +626,10 @@ var VSS;
     var initialContribution;
     var initOptions;
     var loaderConfigured = false;
-    var usingPlatformScripts;
-    var usingPlatformStyles;
+    var usingLoader = false;
     var isReady = false;
     var readyCallbacks;
     var parentChannel = XDM.XDMChannelManager.get().addChannel(window.parent);
-    /**
-    * Service Ids for core services (to be used in VSS.getService)
-    */
-    var ServiceIds;
-    (function (ServiceIds) {
-        /**
-        * Service for showing dialogs in the host frame
-        * Use: <IHostDialogService>
-        */
-        ServiceIds.Dialog = "ms.vss-web.dialog-service";
-        /**
-        * Service for interacting with the host frame's navigation (getting/updating the address/hash, reloading the page, etc.)
-        * Use: <IHostNavigationService>
-        */
-        ServiceIds.Navigation = "ms.vss-web.navigation-service";
-        /**
-        * Service for interacting with extension data (setting/setting documents and collections)
-        * Use: <IExtensionDataService>
-        */
-        ServiceIds.ExtensionData = "ms.vss-web.data-service";
-    })(ServiceIds = VSS.ServiceIds || (VSS.ServiceIds = {}));
     /**
      * Initiates the handshake with the host window.
      *
@@ -668,9 +637,7 @@ var VSS;
      */
     function init(options) {
         initOptions = options || {};
-        // Back-compat support for setupModuleLoader - remove this option after M85
-        usingPlatformScripts = initOptions.usePlatformScripts || initOptions.setupModuleLoader;
-        usingPlatformStyles = initOptions.usePlatformStyles;
+        usingLoader = initOptions.setupModuleLoader;
         // Run this after current execution path is complete - allows objects to get initialized
         window.setTimeout(function () {
             var appHandshakeData = {
@@ -684,7 +651,7 @@ var VSS;
                 initialConfiguration = handshakeData.initialConfig || {};
                 initialContribution = handshakeData.contribution;
                 extensionContext = handshakeData.extensionContext;
-                if (usingPlatformScripts || usingPlatformStyles) {
+                if (usingLoader) {
                     setupAmdLoader();
                 }
                 else {
@@ -718,7 +685,8 @@ var VSS;
         }
         if (!callback) {
             // Generate an empty callback for require
-            callback = function () { };
+            callback = function () {
+            };
         }
         if (loaderConfigured) {
             // Loader already configured, just issue require
@@ -728,8 +696,8 @@ var VSS;
             if (!initOptions) {
                 init({ setupModuleLoader: true });
             }
-            else if (!usingPlatformScripts) {
-                usingPlatformScripts = true;
+            else if (!usingLoader) {
+                usingLoader = true;
                 if (isReady) {
                     // We are in the ready state, but previously not using the loader, so set it up now
                     // which will re-trigger ready
@@ -804,43 +772,27 @@ var VSS;
     /**
     * Get a contributed service from the parent host.
     *
-    * @param contributionId Full Id of the service contribution to get the instance of
+    * @param serviceId Id of the vss.web#service contribution to get the instance of
     * @param context Optional context information to use when obtaining the service instance
     */
-    function getService(contributionId, context) {
-        if (typeof context === "undefined") {
-            context = {
-                webContext: getWebContext(),
-                extensionContext: getExtensionContext()
-            };
-        }
-        return getServiceContribution(contributionId).then(function (serviceContribution) {
-            return serviceContribution.getInstance(serviceContribution.id, context);
-        });
-    }
-    VSS.getService = getService;
-    /**
-    * Get the contribution with the given contribution id. The returned contribution has a method to get a registered object within that contribution.
-    *
-    * @param contributionId Id of the contribution to get
-    */
-    function getServiceContribution(contributionId) {
+    function getService(serviceId, context) {
         var deferred = XDM.createDeferred();
         VSS.ready(function () {
-            parentChannel.invokeRemoteMethod("getServiceContribution", "vss.hostManagement", [contributionId]).then(deferred.resolve, deferred.reject);
+            parentChannel.invokeRemoteMethod("getService", "vss.hostManagement", [serviceId, context]).then(deferred.resolve, deferred.reject);
         });
         return deferred.promise;
     }
-    VSS.getServiceContribution = getServiceContribution;
+    VSS.getService = getService;
     /**
-    * Get contributions that target a given contribution id. The returned contributions have a method to get a registered object within that contribution.
+    * For a given contribution point id, get contributions which contribute background services.
     *
-    * @param targetContributionId Contributions that target the contribution with this id will be returned
+    * @param contributionPointId Contribution point id to query
+    * @param contributionId Optional filter to only include contributions with the given id
     */
-    function getServiceContributions(targetContributionId) {
+    function getServiceContributions(contributionPointId, contributionId) {
         var deferred = XDM.createDeferred();
         VSS.ready(function () {
-            parentChannel.invokeRemoteMethod("getServiceContributions", "vss.hostManagement", [targetContributionId]).then(deferred.resolve, deferred.reject);
+            parentChannel.invokeRemoteMethod("getServiceContributions", "vss.hostManagement", [contributionPointId, contributionId]).then(deferred.resolve, deferred.reject);
         });
         return deferred.promise;
     }
@@ -873,13 +825,6 @@ var VSS;
     }
     VSS.getAccessToken = getAccessToken;
     /**
-    * Fetch an token which can be used to identify the current user
-    */
-    function getAppToken() {
-        return parentChannel.invokeRemoteMethod("getAppToken", "VSS.HostControl");
-    }
-    VSS.getAppToken = getAppToken;
-    /**
     * Requests the parent window to resize the container for this extension based on the current extension size.
     */
     function resize() {
@@ -896,23 +841,15 @@ var VSS;
         // MS Ajax config needs to exist before loading MS Ajax library
         window.__cultureInfo = hostPageContext.microsoftAjaxConfig.cultureInfo;
         // Append CSS first
-        if (usingPlatformStyles !== false) {
-            if (hostPageContext.coreReferences.stylesheets) {
-                hostPageContext.coreReferences.stylesheets.forEach(function (stylesheet) {
-                    if (stylesheet.isCoreStylesheet) {
-                        var cssLink = document.createElement("link");
-                        cssLink.href = getAbsoluteUrl(stylesheet.url, hostRootUri);
-                        cssLink.rel = "stylesheet";
-                        safeAppendToDom(cssLink, "head");
-                    }
-                });
-            }
-        }
-        if (!usingPlatformScripts) {
-            // Just wanted to load CSS, no scripts. Can exit here.
-            loaderConfigured = true;
-            triggerReady();
-            return;
+        if (hostPageContext.coreReferences.stylesheets) {
+            hostPageContext.coreReferences.stylesheets.forEach(function (stylesheet) {
+                if (stylesheet.isCoreStylesheet) {
+                    var cssLink = document.createElement("link");
+                    cssLink.href = getAbsoluteUrl(stylesheet.url, hostRootUri);
+                    cssLink.rel = "stylesheet";
+                    safeAppendToDom(cssLink, "head");
+                }
+            });
         }
         var scripts = [];
         // Add scripts and loader configuration
@@ -1039,7 +976,7 @@ var VSS;
             safeAppendToDom(scriptTag, "head");
         }
         else if (scripts[index].content) {
-            scriptTag.textContent = scripts[index].content;
+            scriptTag.innerText = scripts[index].content;
             safeAppendToDom(scriptTag, "head");
             addScriptElements.call(this, scripts, index + 1, callback);
         }
@@ -1075,11 +1012,10 @@ var VSS;
         var _this = this;
         isReady = true;
         if (readyCallbacks) {
-            var savedReadyCallbacks = readyCallbacks;
-            readyCallbacks = null;
-            savedReadyCallbacks.forEach(function (callback) {
+            readyCallbacks.forEach(function (callback) {
                 callback.call(_this);
             });
+            readyCallbacks = null;
         }
     }
 })(VSS || (VSS = {}));

@@ -25,7 +25,7 @@ var AddFolderDialog = (function () {
             folderName: $("#folderName").val(),
             addPlaceHolderFile: this.versionControlType === "Git",
             placeHolderFileName: "_placeHolderFile.md",
-            comment: $("#comment").val()
+            comment: $("#comment").val(),
         };
     };
     AddFolderDialog.prototype.triggerCallbacks = function () {
@@ -67,4 +67,3 @@ VSS.register("createNewFolderDialog", function (context) {
     return new AddFolderDialog();
 });
 VSS.notifyLoadSucceeded();
-//# sourceMappingURL=dialog.js.map

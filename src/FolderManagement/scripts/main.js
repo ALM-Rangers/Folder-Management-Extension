@@ -30,14 +30,8 @@ var AddFolderMenu = (function () {
         VSS.getService("ms.vss-web.dialog-service").then(function (dialogSvc) {
             var createNewFolderDialog;
             var sourceControlType = _this.getSourceControlType();
-            // contribution info
             var extInfo = VSS.getExtensionContext();
             var dialogContributionId = extInfo.publisherId + "." + extInfo.extensionId + "." + "createNewFolderDialog";
-            //var controlContributionInfo: IContribution = {
-            //    id: "createNewFolderDialog",
-            //    extensionId: VSS.getExtensionContext().id,
-            //    pointId: VSS.getExtensionContext().namespace + "#dialog"
-            //};
             var callBack;
             if (sourceControlType == "Git") {
                 callBack = new GitFolderManager(_this.actionContext).dialogCallback;
@@ -54,7 +48,7 @@ var AddFolderMenu = (function () {
                 okCallback: callBack,
                 getDialogResult: function () {
                     return createNewFolderDialog ? createNewFolderDialog.getFormInputs() : null;
-                }
+                },
             };
             dialogSvc.openDialog(dialogContributionId, dialogOptions).then(function (dialog) {
                 dialog.getContributionInstance("createNewFolderDialog").then(function (createNewFolderDialogInstance) {
@@ -79,4 +73,3 @@ var AddFolderMenu = (function () {
 VSS.register("addFolder", function (context) {
     return new AddFolderMenu();
 });
-//# sourceMappingURL=main.js.map
