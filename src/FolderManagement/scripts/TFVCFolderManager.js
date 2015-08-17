@@ -29,12 +29,14 @@ var TFVCFolderManager = (function (_super) {
                 path += "/" + result.folderName;
                 var vsoContext = VSS.getWebContext();
                 tfvcClient.getItem(undefined, undefined, undefined, undefined, path, Contracts.VersionControlRecursionType.OneLevel, undefined).then(function (itemsMetaData) {
+                    // check and see if folder already exists, if it does, just return out of here
                     for (var i = 0; i < itemsMetaData.value.length; i++) {
                         var current = itemsMetaData.value[i];
                         if (current.isFolder && current.path.indexOf(path) === 0) {
                             return;
                         }
                     }
+                    // folder doesn't exist, go and create one
                     var data = {
                         comment: result.comment,
                         changes: [
@@ -42,7 +44,7 @@ var TFVCFolderManager = (function (_super) {
                                 changeType: 1,
                                 item: {
                                     path: path + "/" + result.placeHolderFileName,
-                                    contentMetadata: { encoding: 65001 },
+                                    contentMetadata: { encoding: 65001 }
                                 },
                                 newContent: {
                                     content: "Placeholder file for new folder",
@@ -59,3 +61,4 @@ var TFVCFolderManager = (function (_super) {
     }
     return TFVCFolderManager;
 })(FolderManager);
+//# sourceMappingURL=TFVCFolderManager.js.map

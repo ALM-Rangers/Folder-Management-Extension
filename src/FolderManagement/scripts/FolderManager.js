@@ -21,3 +21,4 @@ var FolderManager = (function () {
     };
     return FolderManager;
 })();
+//# sourceMappingURL=FolderManager.js.map

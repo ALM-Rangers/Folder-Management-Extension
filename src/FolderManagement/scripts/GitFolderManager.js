@@ -15,6 +15,7 @@ var __extends = (this && this.__extends) || function (d, b) {
     __.prototype = b.prototype;
     d.prototype = new __();
 };
+//---------------------------------------------------------------------
 var GitFolderManager = (function (_super) {
     __extends(GitFolderManager, _super);
     function GitFolderManager(actionContext) {
@@ -32,6 +33,7 @@ var GitFolderManager = (function (_super) {
             VSS.require(["VSS/Service", "TFS/VersionControl/GitRestClient", "TFS/VersionControl/Contracts"], function (Service, RestClient, Contracts) {
                 var gitClient = Service.getClient(RestClient.GitHttpClient);
                 gitClient.getItems(repositoryId, undefined, basePath, Contracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(function (result) {
+                    // check and see if the folder already exists
                     var folderPath = basePath ? basePath + "/" + folderName : folderName;
                     for (var i = 0; i < result.length; i++) {
                         var current = result[i];
@@ -39,6 +41,7 @@ var GitFolderManager = (function (_super) {
                             return;
                         }
                     }
+                    // folder doesn't exist, create it
                     gitClient.getCommits(repositoryId, { $top: 1 }, undefined, undefined, undefined).then(function (commits) {
                         var oldCommitId = commits[0].commitId;
                         var data = self.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
@@ -80,3 +83,4 @@ var GitFolderManager = (function (_super) {
     };
     return GitFolderManager;
 })(FolderManager);
+//# sourceMappingURL=GitFolderManager.js.map
