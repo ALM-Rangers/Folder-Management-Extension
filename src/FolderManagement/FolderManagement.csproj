@@ -27,6 +27,7 @@
     <Content Include="images\show-properties.png" />
     <Content Include="images\VSO_Folder_16x.png" />
     <Content Include="images\VSO_Folder_196x.png" />
+    <Content Include="images\VSO_Folder_wide.png" />
     <Content Include="main.html" />
     <Content Include="scripts\dialog.js" />
     <Content Include="scripts\FolderManager.js" />
@@ -52,6 +53,7 @@
     <Content Include="vwd.webinfo" />
     <Content Include="extension.me.json" />
     <Content Include="m85_extension.json" />
+    <None Include="foldermanagement-vsoextensions-almrangers.pubxml" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
