@@ -31,6 +31,7 @@ class AddFolderMenu {
         return sourceControlType;
     }
 
+
     private showDialog() {
         VSS.getService("ms.vss-web.dialog-service").then((dialogSvc: IHostDialogService) => {
             var createNewFolderDialog;
