@@ -52,7 +52,6 @@
     <Content Include="extension.json" />
     <Content Include="vwd.webinfo" />
     <Content Include="extension.me.json" />
-    <Content Include="m85_extension.json" />
     <None Include="foldermanagement-vsoextensions-almrangers.pubxml" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
