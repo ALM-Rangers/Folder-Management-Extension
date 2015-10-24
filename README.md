@@ -1,4 +1,4 @@
-# VSO Extension - Folder Management
+﻿# VSO Extension - Folder Management
 
 ### What
 Easily and quickly create new folders in Code Explorer through the Web Access for TFVC and Git.
@@ -13,7 +13,7 @@ Previously you could only create new files from web access. To add a folder, you
 4. The root of the extension should be at the root of the web server, for example: https://myserver/images/fabrikam-logo.png
 5. Update the extension manifest file (extension.json). To do this, update the  namespace field to a globally unique value. For example: johnsmith.samples.foldermanagement. Also, update the  baseUri  field to be the fully qualified URL to the root of your web server, for example:  https://myserver 
 8. Install the extension into your Visual Studio Online account
-9. Navigate to  https://youraccount.visualstudio.com/_admin/_ext  (replace your account with your real account name)
+9. Navigate to  https://youraccount.visualstudio.com/DefaultCollection/_admin/_ext  (replace your account with your real account name)
 10. Click Install and browse to your manifest file, for example extension.json
 11. Click OK
 
