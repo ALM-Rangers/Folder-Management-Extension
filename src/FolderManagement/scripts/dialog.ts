@@ -65,7 +65,7 @@ export class AddFolderDialog {
             isValid = false;
         }
 
-        if (formInput.folderName.indexOf('/') > -1) {
+        if (formInput.folderName.indexOf('\\') > -1) {
             isValid = false;
         }
 

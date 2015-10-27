@@ -45,7 +45,7 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
                 || !formInput.folderName.trim()) {
                 isValid = false;
             }
-            if (formInput.folderName.indexOf('/') > -1) {
+            if (formInput.folderName.indexOf('\\') > -1) {
                 isValid = false;
             }
             this.stateChangedCallback.forEach(function (callback) {
