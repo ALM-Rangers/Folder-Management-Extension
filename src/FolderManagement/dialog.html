@@ -33,13 +33,17 @@
     </div>
     <textarea class="comment-input" id="comment">Added new folder</textarea>
     <div class="error-container"></div>
+    
     <script src="sdk/scripts/VSS.SDK.js"></script>
-    <script src="scripts/dialog.js"></script>
     <script type="text/javascript">
         VSS.init({
             explicitNotifyLoaded: true,
             usePlatformScripts: true,
             usePlatformStyles: true
+        });
+
+         VSS.ready(function () {
+            require(["scripts/dialog"], function (dialog) { });
         });
     </script>
 </body>

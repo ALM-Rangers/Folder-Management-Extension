@@ -12,30 +12,31 @@
 //--------------------------------------------------------------------- 
 
 /// <reference path='ref/VSS.d.ts' />
- 
- interface IFormInput {
-     folderName: string;
-     addPlaceHolderFile: boolean;
-     placeHolderFileName: string;
-     comment: string;
- }
+import Main = require("scripts/main");
 
-class AddFolderDialog {
+export interface IFormInput {
+    folderName: string;
+    addPlaceHolderFile: boolean;
+    placeHolderFileName: string;
+    comment: string;
+}
+
+export class AddFolderDialog {
 
     constructor() {
-        $("#folderName").on('input propertychange paste',() => {
+        $("#folderName").on('input propertychange paste', () => {
             this.triggerCallbacks();
         });
     }
 
     private formChangedCallbacks = [];
     private stateChangedCallback = [];
-    private versionControlType;
+    private versionControlType: Main.SourceControl;
 
     private getFormInput(): IFormInput {
         return {
             folderName: $("#folderName").val(),
-            addPlaceHolderFile: this.versionControlType === "Git",
+            addPlaceHolderFile: this.versionControlType == Main.SourceControl.Git,
             placeHolderFileName: "_placeHolderFile.md",
             comment: $("#comment").val(),
         };
@@ -48,6 +49,10 @@ class AddFolderDialog {
         });
 
         this.validateState();
+    }
+    
+    private removePlaceHolderMesssage() {
+        $(".git-file").html("<br/>");
     }
 
     private validateState() {
@@ -69,8 +74,12 @@ class AddFolderDialog {
     public getFormInputs() {
         return this.getFormInput();
     }
-    public setVersionControl(type) {
+    public setVersionControl(type: Main.SourceControl) {
         this.versionControlType = type;
+
+        if (type == Main.SourceControl.TFVC) {
+            this.removePlaceHolderMesssage();
+        }
     }
 
     public setCurrentPath(path: string) {

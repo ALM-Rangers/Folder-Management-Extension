@@ -7,7 +7,7 @@
     PARTICULAR PURPOSE AND NONINFRINGEMENT.
 </copyright>
 <summary>
-    The content of this file is loaded by VSO to load the extension. 
+    The content of this file is loaded by VSO to load the extension.
     This file loads the required scripts and initializes the extension SDK.
 </summary>
 ----------------------------------------------------------------------->
@@ -16,20 +16,21 @@
 <head>
     <meta charset="UTF-8">
     <title>Folder Management</title>
+    <script src="sdk/scripts/VSS.SDK.js"></script>
+
 </head>
 <body>
     <div>Users will never see this page.</div>
-
-    <script src="sdk/scripts/VSS.SDK.js"></script>
-    <script src="scripts/FolderManager.js"></script>
-    <script src="scripts/GitFolderManager.js"></script>
-    <script src="scripts/TFVCFolderManager.js"></script>
-    <script src="scripts/main.js"></script>
-    <script>
-        VSS.init({
+    <script type="text/javascript">
+        VSS.init(
+        {
+            explicitNotifyLoaded:true,
             setupModuleLoader: true,
             usePlatformScripts: true,
             usePlatformStyles: true
+        });
+        VSS.ready(function () {
+            require(["scripts/main"], function (main) { });
         });
     </script>
 </body>

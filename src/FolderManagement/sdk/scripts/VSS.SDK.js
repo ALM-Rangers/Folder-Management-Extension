@@ -330,7 +330,7 @@ var XDM;
                     return false;
                 }
                 if (rpcMessage.error) {
-                    deferred.reject(rpcMessage.error);
+                    deferred.reject(this._customDeserializeObject([rpcMessage.error])[0]);
                 }
                 else {
                     deferred.resolve(this._customDeserializeObject([rpcMessage.result])[0]);
@@ -479,16 +479,24 @@ var XDM;
             else {
                 returnValue = {};
                 parentObjects.newObjects.push(returnValue);
-                var keys = [];
+                var keys = {};
                 try {
+                    // We want to get both enumerable and non-enumerable properties
+                    // including inherited enumerable properties. for..in grabs
+                    // enumerable properties (including inherited properties) and
+                    // getOwnPropertyNames includes non-enumerable properties.
+                    // Merge these results together.
                     for (var key in obj) {
-                        keys.push(key);
+                        keys[key] = true;
+                    }
+                    var ownProperties = Object.getOwnPropertyNames(obj);
+                    for (var i = 0, l = ownProperties.length; i < l; i++) {
+                        keys[ownProperties[i]] = true;
                     }
                 }
                 catch (ex) {
                 }
-                for (var i = 0, l = keys.length; i < l; i++) {
-                    var key = keys[i];
+                for (var key in keys) {
                     // Don't serialize properties that start with an underscore.
                     if ((key && key[0] !== "_") || (settings && settings.includeUnderscoreProperties)) {
                         serializeMember(obj, returnValue, key);
@@ -627,7 +635,7 @@ var XDM;
 var VSS;
 (function (VSS) {
     VSS.VssSDKVersion = 0.1;
-    VSS.VssSDKRestVersion = "2.0";
+    VSS.VssSDKRestVersion = "2.1";
     var htmlElement;
     var webContext;
     var hostPageContext;
@@ -669,8 +677,7 @@ var VSS;
      */
     function init(options) {
         initOptions = options || {};
-        // Back-compat support for setupModuleLoader - remove this option after M85
-        usingPlatformScripts = initOptions.usePlatformScripts || initOptions.setupModuleLoader;
+        usingPlatformScripts = initOptions.usePlatformScripts;
         usingPlatformStyles = initOptions.usePlatformStyles;
         // Run this after current execution path is complete - allows objects to get initialized
         window.setTimeout(function () {
@@ -830,7 +837,13 @@ var VSS;
     function getServiceContribution(contributionId) {
         var deferred = XDM.createDeferred();
         VSS.ready(function () {
-            parentChannel.invokeRemoteMethod("getServiceContribution", "vss.hostManagement", [contributionId]).then(deferred.resolve, deferred.reject);
+            parentChannel.invokeRemoteMethod("getServiceContribution", "vss.hostManagement", [contributionId]).then(function (contribution) {
+                var serviceContribution = contribution;
+                serviceContribution.getInstance = function (objectId, context) {
+                    return getBackgroundContributionInstance(contribution, objectId, context);
+                };
+                deferred.resolve(serviceContribution);
+            }, deferred.reject);
         });
         return deferred.promise;
     }
@@ -843,11 +856,35 @@ var VSS;
     function getServiceContributions(targetContributionId) {
         var deferred = XDM.createDeferred();
         VSS.ready(function () {
-            parentChannel.invokeRemoteMethod("getServiceContributions", "vss.hostManagement", [targetContributionId]).then(deferred.resolve, deferred.reject);
+            parentChannel.invokeRemoteMethod("getContributionsForTarget", "vss.hostManagement", [targetContributionId]).then(function (contributions) {
+                var serviceContributions = [];
+                contributions.forEach(function (contribution) {
+                    var serviceContribution = contribution;
+                    serviceContribution.getInstance = function (objectId, context) {
+                        return getBackgroundContributionInstance(contribution, objectId, context);
+                    };
+                    serviceContributions.push(serviceContribution);
+                });
+                deferred.resolve(serviceContributions);
+            }, deferred.reject);
         });
         return deferred.promise;
     }
     VSS.getServiceContributions = getServiceContributions;
+    /**
+    * Create an instance of a registered object within the given contribution in the host's frame
+    *
+    * @param contribution The contribution to get an object from
+    * @param objectId Optional id of the registered object (the contribution's id property is used by default)
+    * @param contextData Optional context to use when getting the object.
+    */
+    function getBackgroundContributionInstance(contribution, objectId, contextData) {
+        var deferred = XDM.createDeferred();
+        VSS.ready(function () {
+            parentChannel.invokeRemoteMethod("getBackgroundContributionInstance", "vss.hostManagement", [contribution, objectId, contextData]).then(deferred.resolve, deferred.reject);
+        });
+        return deferred.promise;
+    }
     /**
     * Register an object (instance or factory method) that this extension exposes to the host frame.
     *

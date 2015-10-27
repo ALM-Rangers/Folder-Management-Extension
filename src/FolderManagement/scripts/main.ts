@@ -13,7 +13,13 @@
 
 /// <reference path='ref/VSS.d.ts' />
 
-class AddFolderMenu {
+import GitFolderManager = require("scripts/GitFolderManager");
+import TFVCFolderManager = require("scripts/TFVCFolderManager");
+import Dialog = require("scripts/dialog");
+
+export enum SourceControl { Git, TFVC };
+
+export class AddFolderMenu {
     private actionContext;
 
     public execute(actionContext) {
@@ -22,37 +28,29 @@ class AddFolderMenu {
     }
 
     private getSourceControlType() {
-        var sourceControlType = "TFVC";
-
         if (this.actionContext.gitRepository) {
-            sourceControlType = "Git";
+            return SourceControl.Git;
         }
-
-        return sourceControlType;
+        else {
+            return SourceControl.TFVC
+        }
     }
-
 
     private showDialog() {
         VSS.getService("ms.vss-web.dialog-service").then((dialogSvc: IHostDialogService) => {
-            var createNewFolderDialog;
+            var createNewFolderDialog: Dialog.AddFolderDialog;
             var sourceControlType = this.getSourceControlType();
 
             // contribution info
             var extInfo = VSS.getExtensionContext();
             var dialogContributionId = extInfo.publisherId + "." + extInfo.extensionId + "." + "createNewFolderDialog";
 
-            //var controlContributionInfo: IContribution = {
-            //    id: "createNewFolderDialog",
-            //    extensionId: VSS.getExtensionContext().id,
-            //    pointId: VSS.getExtensionContext().namespace + "#dialog"
-            //};
-
             var callBack;
-            if (sourceControlType == "Git") {
-                callBack = new GitFolderManager(this.actionContext).dialogCallback;
+            if (sourceControlType == SourceControl.Git) {
+                callBack = new GitFolderManager.GitFolderManager(this.actionContext).dialogCallback;
             }
             else {
-                callBack = new TFVCFolderManager(this.actionContext).dialogCallback;
+                callBack = new TFVCFolderManager.TFVCFolderManager(this.actionContext).dialogCallback;
             }
 
             var dialogOptions: IHostDialogOptions = {
@@ -68,15 +66,17 @@ class AddFolderMenu {
             };
 
             dialogSvc.openDialog(dialogContributionId, dialogOptions).then((dialog) => {
-                dialog.getContributionInstance("createNewFolderDialog").then((createNewFolderDialogInstance) => {
+                dialog.getContributionInstance("createNewFolderDialog").then((createNewFolderDialogInstance: Dialog.AddFolderDialog) => {
                     createNewFolderDialog = createNewFolderDialogInstance;
                     createNewFolderDialog.setVersionControl(sourceControlType);
 
-                    var path = this.actionContext.serverItem ?
-                        this.actionContext.serverItem : this.actionContext.path;
+                    var path = "";
 
-                    if (sourceControlType == "Git") {
-                        path = this.actionContext.repositoryName + path;
+                    if (sourceControlType == SourceControl.Git) {
+                        path = this.actionContext.gitRepository.name + this.actionContext.item.path;
+                    }
+                    else {
+                        path = this.actionContext.item.path;
                     }
 
                     createNewFolderDialog.setCurrentPath(path);
@@ -94,3 +94,4 @@ class AddFolderMenu {
 VSS.register("addFolder", function (context) {
     return new AddFolderMenu();
 });
+VSS.notifyLoadSucceeded();

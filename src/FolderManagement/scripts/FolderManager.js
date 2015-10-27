@@ -10,15 +10,18 @@
 // Base TypeScript class for the Git and TFVC Folder Manager classes.
 // </summary>
 //---------------------------------------------------------------------
-var FolderManager = (function () {
-    function FolderManager(actionContext) {
-        this.actionContext = actionContext;
-    }
-    FolderManager.prototype.refreshBrowserWindow = function () {
-        VSS.getService("ms.vss-web.navigation-service").then(function (historyService) {
-            historyService.reload();
-        });
-    };
-    return FolderManager;
-})();
+define(["require", "exports"], function (require, exports) {
+    var FolderManager = (function () {
+        function FolderManager(actionContext) {
+            this.actionContext = actionContext;
+        }
+        FolderManager.prototype.refreshBrowserWindow = function () {
+            VSS.getService("ms.vss-web.navigation-service").then(function (historyService) {
+                historyService.reload();
+            });
+        };
+        return FolderManager;
+    })();
+    exports.FolderManager = FolderManager;
+});
 //# sourceMappingURL=FolderManager.js.map
