@@ -21,13 +21,12 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
             var _this = this;
             _super.call(this, actionContext);
             this.dialogCallback = function (result) {
-                var self = _this;
-                var actionContext = self.actionContext;
+                var actionContext = _this.actionContext;
                 var folderName = result.folderName;
                 var placeHolderFileName = result.placeHolderFileName;
                 var repositoryId = actionContext.gitRepository.id;
                 var branchName = actionContext.version;
-                var basePath = self.actionContext.item ? self.actionContext.item.path : "";
+                var basePath = _this.actionContext.item ? _this.actionContext.item.path : "";
                 var comment = result.comment;
                 var gitClient = RestClient.getClient();
                 gitClient.getItems(repositoryId, undefined, basePath, VCContracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(function (result) {
@@ -39,12 +38,13 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
                             return;
                         }
                     }
+                    var criteria = { $top: 1 };
                     // folder doesn't exist, create it
-                    gitClient.getCommits(repositoryId, { $top: 1, $skip: 0 }, undefined, undefined, undefined).then(function (commits) {
+                    gitClient.getCommits(repositoryId, criteria, undefined, undefined, undefined).then(function (commits) {
                         var oldCommitId = commits[0].commitId;
-                        var data = self.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+                        var data = _this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
                         gitClient.createPush(data, repositoryId, undefined).then(function () {
-                            self.refreshBrowserWindow();
+                            _this.refreshBrowserWindow();
                         });
                     });
                 });

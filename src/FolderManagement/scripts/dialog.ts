@@ -65,6 +65,10 @@ export class AddFolderDialog {
             isValid = false;
         }
 
+        if (formInput.folderName.indexOf('/') > -1) {
+            isValid = false;
+        }
+
         this.stateChangedCallback.forEach(function (callback) {
             callback(isValid);
         });

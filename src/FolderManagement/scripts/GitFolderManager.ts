@@ -52,21 +52,19 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
     }
 
     public dialogCallback: (result: Dialog.IFormInput) => void = (result) => {
-        var self = this;
+        var actionContext = this.actionContext;
 
-        var actionContext = self.actionContext;
-        
         var folderName = result.folderName;
         var placeHolderFileName = result.placeHolderFileName;
         var repositoryId = actionContext.gitRepository.id;
         var branchName = actionContext.version;
-        var basePath = self.actionContext.item ? self.actionContext.item.path : "";
+        var basePath = this.actionContext.item ? this.actionContext.item.path : "";
         var comment = result.comment;
 
         var gitClient = RestClient.getClient();
 
         gitClient.getItems(repositoryId, undefined, basePath, VCContracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(
-            function (result) {
+            (result) => {
                 // check and see if the folder already exists
                 var folderPath = basePath ? basePath + "/" + folderName : folderName;
                 for (var i = 0; i < result.length; i++) {
@@ -75,17 +73,19 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
                         return;
                     }
                 }
+
+                var criteria = <VCContracts.GitQueryCommitsCriteria>{ $top: 1, };
                 
                 // folder doesn't exist, create it
-                (<any>gitClient).getCommits(repositoryId, { $top: 1, $skip: 0 }, undefined, undefined, undefined).then(
-                    function (commits) {
+                gitClient.getCommits(repositoryId, criteria, undefined, undefined, undefined).then(
+                    (commits) => {
                         var oldCommitId = commits[0].commitId
 
-                        var data = self.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+                        var data = this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
 
                         (<any>gitClient).createPush(data, repositoryId, undefined).then(
-                            function () {
-                                self.refreshBrowserWindow();
+                            () => {
+                                this.refreshBrowserWindow();
                             });
                     });
             });
