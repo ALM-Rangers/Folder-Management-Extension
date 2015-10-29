@@ -7,7 +7,7 @@
 //    PARTICULAR PURPOSE AND NONINFRINGEMENT.
 // </copyright>
 // <summary>
-// TypeScript class that creates a TFVC folder after the user hits create.
+// TypeScript class that creates a TFVC folder.
 // </summary>
 //---------------------------------------------------------------------
 var __extends = (this && this.__extends) || function (d, b) {
@@ -25,38 +25,43 @@ define(["require", "exports", "scripts/FolderManager", "TFS/VersionControl/TfvcR
                 var tfvcClient = RestClient.getClient();
                 var path = _this.actionContext.item.path + "/" + result.folderName;
                 var vsoContext = VSS.getWebContext();
-                //tfvcClient.getItem(undefined, undefined, undefined,
-                //    undefined, path, VCContracts.VersionControlRecursionType.OneLevel,
-                //    undefined).then((itemsMetaData) => {
-                //        // check and see if folder already exists, if it does, just return out of here
-                //        for (var i = 0; i < itemsMetaData.value.length; i++) {
-                //            var current = itemsMetaData.value[i];
-                //            if (current.isFolder && current.path.indexOf(path) === 0) {
-                //                return;
-                //            }
-                //        }
-                var data = {
-                    comment: result.comment,
-                    changes: [
-                        {
-                            changeType: VCContracts.VersionControlChangeType.Add,
-                            item: {
-                                path: path + "/" + result.placeHolderFileName,
-                                contentMetadata: { encoding: 65001 }
-                            },
-                            newContent: {
-                                content: "Placeholder file for new folder",
-                                contentType: VCContracts.ItemContentType.RawText
-                            }
-                        }]
-                };
-                tfvcClient.createChangeset(data, undefined).then(function () {
-                    _this.refreshBrowserWindow();
+                tfvcClient.getItems(undefined, path, VCContracts.VersionControlRecursionType.OneLevel, false, undefined).then(function (itemsMetaData) {
+                    if (_this.checkFolderExists(tfvcClient, path, itemsMetaData))
+                        return;
+                    _this.createNewFolder(tfvcClient, path, result);
                 });
-                //});
-                //});
             };
         }
+        TFVCFolderManager.prototype.checkFolderExists = function (tfvcClient, path, itemsMetaData) {
+            for (var i = 0; i < itemsMetaData.length; i++) {
+                var current = itemsMetaData[i];
+                if (current.isFolder && current.path.indexOf(path) === 0) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        TFVCFolderManager.prototype.createNewFolder = function (tfvcClient, path, result) {
+            var _this = this;
+            var data = {
+                comment: result.comment,
+                changes: [
+                    {
+                        changeType: VCContracts.VersionControlChangeType.Add,
+                        item: {
+                            path: path + "/" + result.placeHolderFileName,
+                            contentMetadata: { encoding: 65001 }
+                        },
+                        newContent: {
+                            content: "Placeholder file for new folder",
+                            contentType: VCContracts.ItemContentType.RawText
+                        }
+                    }]
+            };
+            tfvcClient.createChangeset(data).then(function () {
+                _this.refreshBrowserWindow();
+            });
+        };
         return TFVCFolderManager;
     })(FolderManager.FolderManager);
     exports.TFVCFolderManager = TFVCFolderManager;

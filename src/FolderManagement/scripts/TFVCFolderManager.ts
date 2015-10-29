@@ -7,7 +7,7 @@
 //    PARTICULAR PURPOSE AND NONINFRINGEMENT.
 // </copyright>
 // <summary>
-// TypeScript class that creates a TFVC folder after the user hits create.
+// TypeScript class that creates a TFVC folder.
 // </summary>
 //---------------------------------------------------------------------
 
@@ -28,17 +28,33 @@ export class TFVCFolderManager extends FolderManager.FolderManager
 
         var path = this.actionContext.item.path + "/" + result.folderName;
         var vsoContext = VSS.getWebContext();
-        
-        //tfvcClient.getItem(undefined, undefined, undefined,
-        //    undefined, path, VCContracts.VersionControlRecursionType.OneLevel,
-        //    undefined).then((itemsMetaData) => {
-        //        // check and see if folder already exists, if it does, just return out of here
-        //        for (var i = 0; i < itemsMetaData.value.length; i++) {
-        //            var current = itemsMetaData.value[i];
-        //            if (current.isFolder && current.path.indexOf(path) === 0) {
-        //                return;
-        //            }
-        //        }
+
+        tfvcClient.getItems(undefined, path, VCContracts.VersionControlRecursionType.OneLevel,
+            false, undefined).then((itemsMetaData) => {
+                if (this.checkFolderExists(tfvcClient, path, itemsMetaData)) return;
+                this.createNewFolder(tfvcClient, path, result);
+            });
+    }
+
+    private checkFolderExists(
+        tfvcClient: RestClient.TfvcHttpClient2_1,
+        path: string,
+        itemsMetaData: VCContracts.TfvcItem[])
+    {
+        for (var i = 0; i < itemsMetaData.length; i++) {
+            var current = itemsMetaData[i];
+            if (current.isFolder && current.path.indexOf(path) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private createNewFolder(
+        tfvcClient: RestClient.TfvcHttpClient2_1,
+        path: string,
+        result: Dialog.IFormInput) {
 
         var data = {
             comment: result.comment,
@@ -56,11 +72,9 @@ export class TFVCFolderManager extends FolderManager.FolderManager
                 }]
         };
 
-        (<any>tfvcClient).createChangeset(data, undefined).then(
+        (<any>tfvcClient).createChangeset(data).then(
             () => {
                 this.refreshBrowserWindow();
             });
-        //});
-        //});
     }
 }
