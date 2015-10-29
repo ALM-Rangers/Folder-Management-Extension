@@ -16,6 +16,11 @@
   "categories": [
     "Productivity"
   ],
+  "scopes": [
+    "vso.code_write",
+    "vso.code_manage",
+    "vso.work_write" 
+  ],
   "contributions": [
         {
             "id": "addFolder",
@@ -27,7 +32,7 @@
                 "text": "Create a new folder",
                 "title": "New Folder",
                 "icon": "images/VSO_Folder_16x.png",
-                "group": "actions",
+                "group": "editing",
                 "uri": "main.html"
             }
         },

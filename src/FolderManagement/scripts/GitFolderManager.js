@@ -12,27 +12,24 @@
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-//---------------------------------------------------------------------
-var GitFolderManager = (function (_super) {
-    __extends(GitFolderManager, _super);
-    function GitFolderManager(actionContext) {
-        var _this = this;
-        _super.call(this, actionContext);
-        this.dialogCallback = function (result) {
-            var self = _this;
-            var actionContext = self.actionContext;
-            var folderName = result.folderName;
-            var placeHolderFileName = result.placeHolderFileName;
-            var repositoryId = actionContext.gitRepository.id;
-            var branchName = actionContext.version;
-            var basePath = self.actionContext.item ? self.actionContext.item.path : "";
-            var comment = result.comment;
-            VSS.require(["VSS/Service", "TFS/VersionControl/GitRestClient", "TFS/VersionControl/Contracts"], function (Service, RestClient, Contracts) {
-                var gitClient = Service.getClient(RestClient.GitHttpClient);
-                gitClient.getItems(repositoryId, undefined, basePath, Contracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(function (result) {
+define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionControl/GitRestClient", "scripts/FolderManager"], function (require, exports, VCContracts, RestClient, FolderManager) {
+    var GitFolderManager = (function (_super) {
+        __extends(GitFolderManager, _super);
+        function GitFolderManager(actionContext) {
+            var _this = this;
+            _super.call(this, actionContext);
+            this.dialogCallback = function (result) {
+                var actionContext = _this.actionContext;
+                var folderName = result.folderName;
+                var placeHolderFileName = result.placeHolderFileName;
+                var repositoryId = actionContext.gitRepository.id;
+                var branchName = actionContext.version;
+                var basePath = _this.actionContext.item ? _this.actionContext.item.path : "";
+                var comment = result.comment;
+                var gitClient = RestClient.getClient();
+                gitClient.getItems(repositoryId, undefined, basePath, VCContracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(function (result) {
                     // check and see if the folder already exists
                     var folderPath = basePath ? basePath + "/" + folderName : folderName;
                     for (var i = 0; i < result.length; i++) {
@@ -41,46 +38,47 @@ var GitFolderManager = (function (_super) {
                             return;
                         }
                     }
+                    var criteria = { $top: 1 };
                     // folder doesn't exist, create it
-                    gitClient.getCommits(repositoryId, { $top: 1 }, undefined, undefined, undefined).then(function (commits) {
+                    gitClient.getCommits(repositoryId, criteria, undefined, undefined, undefined).then(function (commits) {
                         var oldCommitId = commits[0].commitId;
-                        var data = self.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+                        var data = _this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
                         gitClient.createPush(data, repositoryId, undefined).then(function () {
-                            self.refreshBrowserWindow();
-                        }, function (x, y, z) {
+                            _this.refreshBrowserWindow();
                         });
                     });
                 });
-            });
-        };
-    }
-    GitFolderManager.prototype.getCommitData = function (branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment) {
-        return {
-            refUpdates: [
-                {
-                    name: "refs/heads/" + branchName,
-                    oldObjectId: oldCommitId
-                }
-            ],
-            commits: [
-                {
-                    comment: comment,
-                    changes: [
-                        {
-                            changeType: "add",
-                            item: {
-                                path: basePath + "/" + folderName + "/" + placeHolderFileName
-                            },
-                            newContent: {
-                                content: "Git placeholder file",
-                                contentType: "rawtext"
+            };
+        }
+        GitFolderManager.prototype.getCommitData = function (branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment) {
+            return {
+                refUpdates: [
+                    {
+                        name: "refs/heads/" + branchName,
+                        oldObjectId: oldCommitId
+                    }
+                ],
+                commits: [
+                    {
+                        comment: comment,
+                        changes: [
+                            {
+                                changeType: "add",
+                                item: {
+                                    path: basePath + "/" + folderName + "/" + placeHolderFileName
+                                },
+                                newContent: {
+                                    content: "Git placeholder file",
+                                    contentType: "rawtext"
+                                }
                             }
-                        }
-                    ]
-                }
-            ]
+                        ]
+                    }
+                ]
+            };
         };
-    };
-    return GitFolderManager;
-})(FolderManager);
+        return GitFolderManager;
+    })(FolderManager.FolderManager);
+    exports.GitFolderManager = GitFolderManager;
+});
 //# sourceMappingURL=GitFolderManager.js.map

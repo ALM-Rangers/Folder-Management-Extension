@@ -1,35 +1,46 @@
 ﻿{
-  "namespace": "almrangers.vsoextensions.FolderManagement",
-  "version": "1.0.0",
-  "name": "Folder Management",  
+  "manifestVersion": 1,
+  "id": null,
+  "version": "1.1.0",
+  "publisher": "alm-rangers",
+  "extensionId": "almrangers-vsoextensions-FolderManagement",
+  "name": "Folder Management",
   "description": "An extension for Visual Studio Online that adds the ability to create new folders directly from web access in the code view",
-  "provider": {
-    "name": "ALM Rangers - Wouter de Kort"
-  },
   "baseUri": "https://foldermanagement-vsoextensions-almrangers.azurewebsites.net/",
-  "icon": "https://foldermanagement-vsoextensions-almrangers.azurewebsites.net/images/VSO_Folder_196x.png",
-  "contributions": {
-    "vss.code.web#sourceTreeItemActions": [
-      {
-        "id": "addFolder",
-        "text": "Create a new folder",
-        "title": "New Folder",
-        "icon": "images/VSO_Folder_16x.png",
-        "group": "actions",
-        "uri": "main.html"
-      }
-    ],
-    "#dialog": [
-      {
-        "id": "createNewFolderDialog",
-        "uri": "dialog.html"
-      }
-    ]
+  "galleryFlags": [
+  ],
+  "icons": {
+    "wide": "images/VSO_Folder_wide.png",
+    "default": "images/VSO_Folder_196x.png"
   },
-  "contributionPoints": {
-    "dialog": {
-      "type": "vss.web#control",
-      "description": "Provider of contribution controls."
-    }
-  }
+  "categories": [
+    "Productivity"
+  ],
+  "scopes":  ["vso.code_write", "vso.code_manage", "vso.work_write"],
+  "contributions": [
+        {
+            "id": "addFolder",
+            "targets": [
+                "ms.vss-code-web.source-tree-item-menu"
+            ],
+            "type": "ms.vss-web.action",
+            "properties": {
+                "text": "Create a new folder",
+                "title": "New Folder",
+                "icon": "images/VSO_Folder_16x.png",
+                "group": "actions",
+                "uri": "main.html"
+            }
+        },
+        {
+            "id": "createNewFolderDialog",
+            "targets": [
+                ".dialog"
+            ],
+            "type": "ms.vss-web.control",
+            "properties": {
+                "uri": "dialog.html"
+            }
+        }
+    ]
 }

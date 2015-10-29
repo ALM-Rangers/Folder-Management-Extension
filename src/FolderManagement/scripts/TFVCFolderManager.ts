@@ -11,12 +11,15 @@
 // </summary>
 //---------------------------------------------------------------------
 
-class TFVCFolderManager extends FolderManager implements IFolderManager {
+import Dialog = require("scripts/Dialog");
+import FolderManager = require("scripts/FolderManager");
+
+export class TFVCFolderManager extends FolderManager.FolderManager implements FolderManager.IFolderManager {
     constructor(actionContext) {
         super(actionContext);
     }
 
-    public dialogCallback: (result: IFormInput) => void = (result) => {
+    public dialogCallback: (result: Dialog.IFormInput) => void = (result) => {
         var self = this;
 
         VSS.require(["VSS/Service", "TFS/VersionControl/TfvcRestClient", "TFS/VersionControl/Contracts"], (Service, RestClient, Contracts) => {
@@ -30,37 +33,37 @@ class TFVCFolderManager extends FolderManager implements IFolderManager {
                 undefined, path, Contracts.VersionControlRecursionType.OneLevel,
                 undefined).then(
 
-                    function (itemsMetaData) {
-                        // check and see if folder already exists, if it does, just return out of here
-                        for (var i = 0; i < itemsMetaData.value.length; i++) {
-                            var current = itemsMetaData.value[i];
-                            if (current.isFolder && current.path.indexOf(path) === 0) {
-                                return;
-                            }
+                function (itemsMetaData) {
+                    // check and see if folder already exists, if it does, just return out of here
+                    for (var i = 0; i < itemsMetaData.value.length; i++) {
+                        var current = itemsMetaData.value[i];
+                        if (current.isFolder && current.path.indexOf(path) === 0) {
+                            return;
                         }
+                    }
 
-                        // folder doesn't exist, go and create one
-                        var data = {
-                            comment: result.comment,
-                            changes: [
-                                {
-                                    changeType: 1,
-                                    item: {
-                                        path: path + "/" + result.placeHolderFileName,
-                                        contentMetadata: { encoding: 65001 },
-                                    },
-                                    newContent: {
-                                        content: "Placeholder file for new folder",
-                                        contentType: 0
-                                    }
-                                }]
-                        };
+                    // folder doesn't exist, go and create one
+                    var data = {
+                        comment: result.comment,
+                        changes: [
+                            {
+                                changeType: 1,
+                                item: {
+                                    path: path + "/" + result.placeHolderFileName,
+                                    contentMetadata: { encoding: 65001 },
+                                },
+                                newContent: {
+                                    content: "Placeholder file for new folder",
+                                    contentType: 0
+                                }
+                            }]
+                    };
 
-                        tfvcClient.createChangeset(data, undefined).then(
-                            function () {
-                                self.refreshBrowserWindow();
-                            });
-                    });
+                    tfvcClient.createChangeset(data, undefined).then(
+                        function () {
+                            self.refreshBrowserWindow();
+                        });
+                });
         });
     }
 }

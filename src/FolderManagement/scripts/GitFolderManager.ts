@@ -12,7 +12,12 @@
 
 //---------------------------------------------------------------------
 
-class GitFolderManager extends FolderManager implements IFolderManager {
+import VCContracts = require("TFS/VersionControl/Contracts");
+import RestClient = require("TFS/VersionControl/GitRestClient");
+import Dialog = require("scripts/Dialog");
+import FolderManager = require("scripts/FolderManager");
+
+export class GitFolderManager extends FolderManager.FolderManager implements FolderManager.IFolderManager {
 
     constructor(actionContext) {
         super(actionContext);
@@ -46,53 +51,43 @@ class GitFolderManager extends FolderManager implements IFolderManager {
         }
     }
 
-    public dialogCallback: (result: IFormInput) => void = (result) => {
-        var self = this;
-
-        var actionContext = self.actionContext;
-
+    public dialogCallback: (result: Dialog.IFormInput) => void = (result) => {
+        var actionContext = this.actionContext;
 
         var folderName = result.folderName;
         var placeHolderFileName = result.placeHolderFileName;
         var repositoryId = actionContext.gitRepository.id;
         var branchName = actionContext.version;
-        var basePath = self.actionContext.item ? self.actionContext.item.path : "";
+        var basePath = this.actionContext.item ? this.actionContext.item.path : "";
         var comment = result.comment;
 
-        VSS.require(["VSS/Service", "TFS/VersionControl/GitRestClient", "TFS/VersionControl/Contracts"], (Service, RestClient, Contracts) => {
-            var gitClient = Service.getClient(RestClient.GitHttpClient);
+        var gitClient = RestClient.getClient();
 
-            gitClient.getItems(repositoryId, undefined, basePath, Contracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(
-                function (result) {
-                    // check and see if the folder already exists
-                    var folderPath = basePath ? basePath + "/" + folderName : folderName;
-                    for (var i = 0; i < result.length; i++) {
-                        var current = result[i];
-                        if (current.isFolder && current.path.indexOf(folderPath) === 0) {
-                            return;
-                        }
+        gitClient.getItems(repositoryId, undefined, basePath, VCContracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(
+            (result) => {
+                // check and see if the folder already exists
+                var folderPath = basePath ? basePath + "/" + folderName : folderName;
+                for (var i = 0; i < result.length; i++) {
+                    var current = result[i];
+                    if (current.isFolder && current.path.indexOf(folderPath) === 0) {
+                        return;
                     }
+                }
 
-                    // folder doesn't exist, create it
-                    gitClient.getCommits(repositoryId, { $top: 1 }, undefined, undefined, undefined).then(
-                        function (commits) {
-                            var oldCommitId = commits[0].commitId
+                var criteria = <VCContracts.GitQueryCommitsCriteria>{ $top: 1, };
+                
+                // folder doesn't exist, create it
+                gitClient.getCommits(repositoryId, criteria, undefined, undefined, undefined).then(
+                    (commits) => {
+                        var oldCommitId = commits[0].commitId
 
-                            var data = self.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+                        var data = this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
 
-                            gitClient.createPush(data, repositoryId, undefined).then(
-
-                                function () {
-                                    self.refreshBrowserWindow();
-                                },
-                                function (x, y, z) {
-
-                                }
-                                );
-                        });
-
-                });
-        });
-
+                        (<any>gitClient).createPush(data, repositoryId, undefined).then(
+                            () => {
+                                this.refreshBrowserWindow();
+                            });
+                    });
+            });
     }
 }

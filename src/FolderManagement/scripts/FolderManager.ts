@@ -11,11 +11,11 @@
 // </summary>
 //---------------------------------------------------------------------
 
-interface IFolderManager {
+export interface IFolderManager {
     dialogCallback;
 }
 
-class FolderManager {
+export class FolderManager {
     protected actionContext;
 
     constructor(actionContext) {
@@ -23,7 +23,7 @@ class FolderManager {
     }
 
     protected refreshBrowserWindow() {
-        VSS.getService("ms.vss-web.navigation-service").then(function (historyService: any) {
+        VSS.getService<IHostNavigationService>("ms.vss-web.navigation-service").then((historyService) => {
             historyService.reload();
         });
     }
