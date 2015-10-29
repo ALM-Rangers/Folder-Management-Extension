@@ -13,57 +13,54 @@
 
 import Dialog = require("scripts/Dialog");
 import FolderManager = require("scripts/FolderManager");
+import RestClient = require("TFS/VersionControl/TfvcRestClient");
+import VCContracts = require("TFS/VersionControl/Contracts");
 
-export class TFVCFolderManager extends FolderManager.FolderManager implements FolderManager.IFolderManager {
+export class TFVCFolderManager extends FolderManager.FolderManager
+    implements FolderManager.IFolderManager {
+
     constructor(actionContext) {
         super(actionContext);
     }
 
     public dialogCallback: (result: Dialog.IFormInput) => void = (result) => {
-        var self = this;
+        var tfvcClient = RestClient.getClient();
 
-        VSS.require(["VSS/Service", "TFS/VersionControl/TfvcRestClient", "TFS/VersionControl/Contracts"], (Service, RestClient, Contracts) => {
-            var tfvcClient = Service.getClient(RestClient.TfvcHttpClient);
+        var path = this.actionContext.item.path + "/" + result.folderName;
+        var vsoContext = VSS.getWebContext();
+        
+        //tfvcClient.getItem(undefined, undefined, undefined,
+        //    undefined, path, VCContracts.VersionControlRecursionType.OneLevel,
+        //    undefined).then((itemsMetaData) => {
+        //        // check and see if folder already exists, if it does, just return out of here
+        //        for (var i = 0; i < itemsMetaData.value.length; i++) {
+        //            var current = itemsMetaData.value[i];
+        //            if (current.isFolder && current.path.indexOf(path) === 0) {
+        //                return;
+        //            }
+        //        }
 
-            var path = self.actionContext.item.path;
-            path += "/" + result.folderName;
-            var vsoContext = VSS.getWebContext();
-
-            tfvcClient.getItem(undefined, undefined, undefined,
-                undefined, path, Contracts.VersionControlRecursionType.OneLevel,
-                undefined).then(
-
-                function (itemsMetaData) {
-                    // check and see if folder already exists, if it does, just return out of here
-                    for (var i = 0; i < itemsMetaData.value.length; i++) {
-                        var current = itemsMetaData.value[i];
-                        if (current.isFolder && current.path.indexOf(path) === 0) {
-                            return;
-                        }
+        var data = {
+            comment: result.comment,
+            changes: [
+                {
+                    changeType: VCContracts.VersionControlChangeType.Add,
+                    item: {
+                        path: path + "/" + result.placeHolderFileName,
+                        contentMetadata: { encoding: 65001 },
+                    },
+                    newContent: {
+                        content: "Placeholder file for new folder",
+                        contentType: VCContracts.ItemContentType.RawText
                     }
+                }]
+        };
 
-                    // folder doesn't exist, go and create one
-                    var data = {
-                        comment: result.comment,
-                        changes: [
-                            {
-                                changeType: 1,
-                                item: {
-                                    path: path + "/" + result.placeHolderFileName,
-                                    contentMetadata: { encoding: 65001 },
-                                },
-                                newContent: {
-                                    content: "Placeholder file for new folder",
-                                    contentType: 0
-                                }
-                            }]
-                    };
-
-                    tfvcClient.createChangeset(data, undefined).then(
-                        function () {
-                            self.refreshBrowserWindow();
-                        });
-                });
-        });
+        (<any>tfvcClient).createChangeset(data, undefined).then(
+            () => {
+                this.refreshBrowserWindow();
+            });
+        //});
+        //});
     }
 }
