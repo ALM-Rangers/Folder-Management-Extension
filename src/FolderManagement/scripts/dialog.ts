@@ -51,10 +51,6 @@ export class AddFolderDialog {
         this.validateState();
     }
     
-    private removePlaceHolderMesssage() {
-        $(".git-file").html("<br/>");
-    }
-
     private validateState() {
         var formInput = this.getFormInput();
 
@@ -80,10 +76,6 @@ export class AddFolderDialog {
     }
     public setVersionControl(type: Main.SourceControl) {
         this.versionControlType = type;
-
-        if (type == Main.SourceControl.TFVC) {
-            this.removePlaceHolderMesssage();
-        }
     }
 
     public setCurrentPath(path: string) {

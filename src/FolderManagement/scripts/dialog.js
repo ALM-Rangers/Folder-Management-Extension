@@ -35,9 +35,6 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
             });
             this.validateState();
         };
-        AddFolderDialog.prototype.removePlaceHolderMesssage = function () {
-            $(".git-file").html("<br/>");
-        };
         AddFolderDialog.prototype.validateState = function () {
             var formInput = this.getFormInput();
             var isValid = true;
@@ -57,9 +54,6 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
         };
         AddFolderDialog.prototype.setVersionControl = function (type) {
             this.versionControlType = type;
-            if (type == Main.SourceControl.TFVC) {
-                this.removePlaceHolderMesssage();
-            }
         };
         AddFolderDialog.prototype.setCurrentPath = function (path) {
             $(".directory").text(path + ".");
