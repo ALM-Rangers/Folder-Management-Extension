@@ -23,8 +23,8 @@ export class FolderManager {
     }
 
     protected refreshBrowserWindow() {
-        VSS.getService<IHostNavigationService>("ms.vss-web.navigation-service").then((historyService) => {
-            historyService.reload();
+        VSS.getService<IHostNavigationService>(VSS.ServiceIds.Navigation).then((navigationService) => {
+            navigationService.reload();
         });
     }
 
