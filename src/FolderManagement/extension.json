@@ -28,7 +28,7 @@
                 "text": "Create a new folder",
                 "title": "New Folder",
                 "icon": "images/VSO_Folder_16x.png",
-                "group": "actions",
+                "groupId": "editing",
                 "uri": "main.html"
             }
         },

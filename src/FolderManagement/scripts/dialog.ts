@@ -26,7 +26,7 @@ export class AddFolderDialog {
     constructor() {
         $("#folderName").on('input propertychange paste', () => {
             this.triggerCallbacks();
-        });
+        });        
     }
 
     private formChangedCallbacks = [];
