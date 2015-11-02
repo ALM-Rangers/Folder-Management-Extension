@@ -37,7 +37,6 @@ define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderMan
             VSS.getService("ms.vss-web.dialog-service").then(function (dialogSvc) {
                 var createNewFolderDialog;
                 var sourceControlType = _this.getSourceControlType();
-                // contribution info
                 var extInfo = VSS.getExtensionContext();
                 var dialogContributionId = extInfo.publisherId + "." + extInfo.extensionId + "." + "createNewFolderDialog";
                 var callBack;
@@ -54,9 +53,10 @@ define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderMan
                     okText: "Create",
                     cancelText: "Cancel",
                     okCallback: callBack,
+                    defaultButton: "ok",
                     getDialogResult: function () {
                         return createNewFolderDialog ? createNewFolderDialog.getFormInputs() : null;
-                    }
+                    },
                 };
                 dialogSvc.openDialog(dialogContributionId, dialogOptions).then(function (dialog) {
                     dialog.getContributionInstance("createNewFolderDialog").then(function (createNewFolderDialogInstance) {
@@ -86,4 +86,3 @@ define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderMan
     });
     VSS.notifyLoadSucceeded();
 });
-//# sourceMappingURL=main.js.map

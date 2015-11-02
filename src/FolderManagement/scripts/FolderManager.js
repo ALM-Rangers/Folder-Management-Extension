@@ -16,7 +16,8 @@ define(["require", "exports"], function (require, exports) {
             this.actionContext = actionContext;
         }
         FolderManager.prototype.refreshBrowserWindow = function () {
-            VSS.getService(VSS.ServiceIds.Navigation).then(function (navigationService) {
+            VSS.getService(VSS.ServiceIds.Navigation)
+                .then(function (navigationService) {
                 navigationService.reload();
             });
         };
@@ -24,4 +25,3 @@ define(["require", "exports"], function (require, exports) {
     })();
     exports.FolderManager = FolderManager;
 });
-//# sourceMappingURL=FolderManager.js.map

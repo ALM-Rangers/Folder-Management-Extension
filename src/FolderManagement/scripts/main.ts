@@ -53,13 +53,14 @@ export class AddFolderMenu {
                 callBack = new TFVCFolderManager.TFVCFolderManager(this.actionContext).dialogCallback;
             }
 
-            var dialogOptions: IHostDialogOptions = {
+            var dialogOptions = {
                 title: "Create new folder",
                 draggable: true,
                 modal: true,
                 okText: "Create",
                 cancelText: "Cancel",
                 okCallback: callBack,
+                defaultButton: "ok",
                 getDialogResult: function () {
                     return createNewFolderDialog ? createNewFolderDialog.getFormInputs() : null;
                 },
@@ -83,6 +84,7 @@ export class AddFolderMenu {
                     createNewFolderDialog.onStateChanged(function (isValid) {
                         dialog.updateOkButton(isValid);
                     });
+
 
                     dialog.updateOkButton(true);
                 });

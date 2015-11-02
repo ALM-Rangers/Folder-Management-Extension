@@ -30,7 +30,6 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
                 var comment = result.comment;
                 var gitClient = RestClient.getClient();
                 gitClient.getItems(repositoryId, undefined, basePath, VCContracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(function (result) {
-                    // check and see if the folder already exists
                     var folderPath = basePath ? basePath + "/" + folderName : folderName;
                     for (var i = 0; i < result.length; i++) {
                         var current = result[i];
@@ -38,8 +37,7 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
                             return;
                         }
                     }
-                    var criteria = { $top: 1 };
-                    // folder doesn't exist, create it
+                    var criteria = { $top: 1, };
                     gitClient.getCommits(repositoryId, criteria, undefined, undefined, undefined).then(function (commits) {
                         var oldCommitId = commits[0].commitId;
                         var data = _this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
@@ -81,4 +79,3 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
     })(FolderManager.FolderManager);
     exports.GitFolderManager = GitFolderManager;
 });
-//# sourceMappingURL=GitFolderManager.js.map

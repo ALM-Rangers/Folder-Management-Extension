@@ -23,8 +23,9 @@ export class FolderManager {
     }
 
     protected refreshBrowserWindow() {
-        VSS.getService<IHostNavigationService>(VSS.ServiceIds.Navigation).then((navigationService) => {
-            navigationService.reload();
+        VSS.getService<IHostNavigationService>(VSS.ServiceIds.Navigation)
+            .then((navigationService) => {
+                navigationService.reload();
         });
     }
 
