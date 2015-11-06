@@ -20,13 +20,6 @@ Check out [Wouter de Kort's](http://blogs.msdn.com/b/willy-peter_schaub/archive/
 ![](https://github.com/ALM-Rangers/VSO-Extension-FolderManagement/blob/master/media/FolderManagementExtension.PNG)
 ![](https://github.com/ALM-Rangers/VSO-Extension-FolderManagement/blob/master/media/FolderManagementExtension_Dialog.PNG)
 
-### M85 Changes
-1. The services "vss.history" and "vss.dialogs" have been renamed to "ms.vss-web.navigation-service" and "ms.vss-web.dialog-service", respectively.
-2. The VSS.init() call now takes two separate properties to load in scripts and styles. Replace setupModuleLoader: true with usePlatformScripts: true or usePlatformStyles: true (or both, if necessary).
-3. The client object model changed which meant changing code to match the new object model
-4. Based on feedback from Will Smythe, all raw REST api calls were refactored to use the REST client api
-5. New manifest file is m85_extension.json
-
 <table>
   <tr>
     <td>
