@@ -6,16 +6,50 @@
   "extensionId": "almrangers-vsoextensions-FolderManagement",
   "name": "Folder Management",
   "description": "An extension for Visual Studio Online that adds the ability to create new folders directly from web access in the code view",
-  "galleryFlags": [
-  ],
   "icons": {
     "wide": "images/VSO-Folder-wide.png",
     "default": "images/VSO-Folder-196x.png"
   },
   "categories": [
-    "Productivity"
+    "Code"
   ],
-  "scopes": [ "vso.code_write", "vso.code_manage" ],
+  "tags": [
+    "code",
+    "folder folders",
+    "directories directory",
+    "create",
+    "Git",
+    "TFVC"
+  ],
+  "screenshots": [
+    {
+      "path": "screenshots/screen1.png"
+    },
+    {
+      "path": "screenshots/screen2.png"
+    }
+  ],
+  "content": {
+    "details": {
+      "path": "overview.md"
+    }
+  },
+  "links": {
+    "home": "http://aka.ms/vsoext01",
+    "getstarted": "http://aka.ms/vsoext01",
+    "license":"http://aka.ms/vsoext01",
+    "support": "http://aka.ms/vsarcontact",
+    "repository": "http://aka.ms/vsoext01",
+    "issues": "http://aka.ms/vsoext01"
+  },
+  "branding": {
+    "color": "rgb(255, 255, 255)",
+    "theme": "light"
+  },
+  "scopes": [
+    "vso.code_write",
+    "vso.code_manage" 
+  ],
   "files": [
     {
       "path": "main.html",
@@ -43,29 +77,29 @@
     }
   ],
   "contributions": [
-        {
-            "id": "addFolder",
-            "targets": [
-                "ms.vss-code-web.source-tree-item-menu"
-            ],
-            "type": "ms.vss-web.action",
-            "properties": {
-                "text": "Create a new folder",
-                "title": "New Folder",
-                "icon": "images/VSO-Folder-16x.png",
-                "groupId": "editing",
-                "uri": "main.html"
-            }
-        },
-        {
-            "id": "createNewFolderDialog",
-            "targets": [
-                ".dialog"
-            ],
-            "type": "ms.vss-web.control",
-            "properties": {
-                "uri": "dialog.html"
-            }
-        }
-    ]
+    {
+      "id": "addFolder",
+      "targets": [
+        "ms.vss-code-web.source-tree-item-menu"
+      ],
+      "type": "ms.vss-web.action",
+      "properties": {
+        "text": "Create a new folder",
+        "title": "New Folder",
+        "icon": "images/VSO-Folder-16x.png",
+        "groupId": "editing",
+        "uri": "main.html"
+      }
+    },
+    {
+      "id": "createNewFolderDialog",
+      "targets": [
+        ".dialog"
+      ],
+      "type": "ms.vss-web.control",
+      "properties": {
+        "uri": "dialog.html"
+      }
+    }
+  ]
 }
