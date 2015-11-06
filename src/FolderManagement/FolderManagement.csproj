@@ -29,6 +29,7 @@
     <Content Include="images\VSO-Folder-196x.png" />
     <Content Include="images\VSO-Folder-wide.png" />
     <Content Include="main.html" />
+    <Content Include="license.txt" />
     <Content Include="scripts\dialog.js" />
     <Content Include="scripts\FolderManager.js" />
     <Content Include="scripts\GitFolderManager.js" />
@@ -52,8 +53,6 @@
     <Content Include="extension.json" />
     <Content Include="vwd.webinfo" />
     <Content Include="extension.me.json" />
-    <None Include="foldermanagement-vsoextensions-almrangers.pubxml" />
-    <None Include="foldermanagement.pubxml" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
@@ -66,6 +65,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="screenshots\" />
+    <Folder Include="scripts\ref\" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
