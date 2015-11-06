@@ -25,9 +25,9 @@
     <Content Include="css\dialog.css" />
     <Content Include="dialog.html" />
     <Content Include="images\show-properties.png" />
-    <Content Include="images\VSO_Folder_16x.png" />
-    <Content Include="images\VSO_Folder_196x.png" />
-    <Content Include="images\VSO_Folder_wide.png" />
+    <Content Include="images\VSO-Folder-16x.png" />
+    <Content Include="images\VSO-Folder-196x.png" />
+    <Content Include="images\VSO-Folder-wide.png" />
     <Content Include="main.html" />
     <Content Include="scripts\dialog.js" />
     <Content Include="scripts\FolderManager.js" />

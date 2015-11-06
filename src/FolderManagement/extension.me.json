@@ -10,8 +10,8 @@
   "galleryFlags": [
   ],
   "icons": {
-    "wide": "images/VSO_Folder_wide.png",
-    "default": "images/VSO_Folder_196x.png"
+    "wide": "images/VSO-Folder-wide.png",
+    "default": "images/VSO-Folder-196x.png"
   },
   "categories": [
     "Productivity"
@@ -31,7 +31,7 @@
             "properties": {
                 "text": "Create a new folder",
                 "title": "New Folder",
-                "icon": "images/VSO_Folder_16x.png",
+                "icon": "images/VSO-Folder_16x.png",
                 "groupId": "editing",
                 "uri": "main.html"
             }
