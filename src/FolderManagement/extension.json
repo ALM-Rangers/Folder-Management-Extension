@@ -38,12 +38,24 @@
     }
   },
   "links": {
-    "home": "http://aka.ms/vsoext01",
-    "getstarted": "http://aka.ms/vsoext01",
-    "support": "http://aka.ms/vsarcontact",
-    "repository": "http://aka.ms/vsoext01",
-    "issues": "http://aka.ms/vsoext01",
-    "learn": "http://blogs.msdn.com/b/visualstudioalmrangers/archive/2015/07/02/folder-management-visual-studio-online-extension-by-wouter-de-kort.aspx"
+    "home": {
+        "uri": "http://aka.ms/vsoext1"
+    },
+    "getstarted": {
+        "uri": "http://aka.ms/vsoext1"
+    },
+    "support": {
+        "uri": "http://aka.ms/vsarcontact"
+    },
+    "repository": {
+        "uri": "http://aka.ms/vsoext1"
+    },
+    "issues": {
+        "uri": "http://aka.ms/vsoext1"
+    },
+    "learn": {
+        "uri": "http://blogs.msdn.com/b/visualstudioalmrangers/archive/2015/07/02/folder-management-visual-studio-online-extension-by-wouter-de-kort.aspx"
+    }
   },
   "branding": {
     "color": "rgb(220, 235, 252)",
