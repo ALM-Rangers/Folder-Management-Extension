@@ -10,6 +10,17 @@ This extension includes:
 
 ----------
 
+**Step by Step**
+
+- Connect to your team project.
+- Select **CODE**.
+- Select the context menu of the folder node, in the left tree view.
+- Select **Create a new folder**.
+- Define a folder name and an optional checkin comment, and click on **Create**.
+- The folder and placeholder file are created.
+
+----------
+
 **Planned Features**
 
 - Make the creation of a placeholder file when creating a folder in TFVC optional.
