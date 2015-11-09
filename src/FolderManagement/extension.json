@@ -91,6 +91,11 @@
       "addressable": true
     }
   ],
+  "targets": [
+        {
+            "id": "Microsoft.VisualStudio.Services"
+        }
+    ],
   "contributions": [
     {
       "id": "addFolder",
