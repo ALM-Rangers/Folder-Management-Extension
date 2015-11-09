@@ -1,13 +1,20 @@
-﻿# Easily create new folders #
 
-Folder Management is an extension for Visual Studio Online that lets you create new folders directly from web access. This is especially helpfull for users who don't have Visual Studio or another IDE installed.
+The **Folder Management** extension provides folder management features in your Visual Studio Online account, such as *easily creating new folders*.
 
-Folder Management can create new folders both for TFVC and for Git. Git doesn't allow empty folders so a file called `_placeholder.md` is added. TFVC has the same behavior for consistency.
+This extension includes:
 
-You can create nested folders by using `/`. For example:
- 
- `   MyNewFolder/MyNestedFolder/AnotherNestedFolder`
-    
-This will create the `_placeholder.md` file in the `AnothernestedFolder ` folder.
+- **New folders** - areate new folders from the code explorer within the Team Web Access.
+- **Git and TFVC** - as empty folders are not allowed with Git, a file called `_placeholder.md` is added as part of the folder creation. TFVC currently has the same behaviour for consistency.
+- **Nested Folders** - You can create nested folders by using `/`. For example, `   MyNewFolder/MyNestedFolder/AnotherNestedFolder`, creates the `_placeholder.md` file in the `AnothernestedFolder` folder.
+- **Checkin Comments** - Specify a checkin comment when creating a folder.
 
-When creating a folder, you can specify a comment for your checkin or push.
+----------
+
+**Planned Features**
+
+- Make the creation of a placeholder file when creating a folder in TFVC optional.
+
+**Known Issues**
+
+- None
+
