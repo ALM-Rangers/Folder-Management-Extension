@@ -1,7 +1,7 @@
 
 The **Folder Management** extension provides folder management features in your Visual Studio Online account, such as *easily creating new folders* in Git and TFVC repos.
 
-**Quick steps to get started**
+**How to use**
 
 1. Connect to your team project.
 1. Select **CODE**.

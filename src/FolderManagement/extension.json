@@ -5,7 +5,7 @@
   "publisher": "alm-rangers",
   "extensionId": "almrangers-vsoextensions-FolderManagement",
   "name": "Folder Management",
-  "description": "Enables you to create new folders from the code explorer within the Team Web Access.",
+  "description": "Create new folders from the code explorer within the Team Web Access.",
   "public": true,
   "icons": {
     "default": "images/VSO-Folder-196x.png"
