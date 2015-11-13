@@ -1,9 +1,8 @@
 ﻿{
   "manifestVersion": 1,
-  "id": null,
+  "id": "FolderManagement",
   "version": "1.1.0",
   "publisher": "alm-rangers",
-  "extensionId": "FolderManagement",
   "name": "Folder Management",
   "description": "Create new folders from the code explorer within the Team Web Access.",
   "public": true,
