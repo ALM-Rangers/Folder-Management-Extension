@@ -3,7 +3,7 @@
   "id": null,
   "version": "1.1.0",
   "publisher": "alm-rangers",
-  "extensionId": "almrangers-vsoextensions-FolderManagement",
+  "extensionId": "FolderManagement",
   "name": "Folder Management",
   "description": "Create new folders from the code explorer within the Team Web Access.",
   "public": true,
