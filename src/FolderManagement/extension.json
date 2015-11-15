@@ -2,9 +2,9 @@
   "manifestVersion": 1,
   "id": "FolderManagement",
   "version": "1.1.0",
-  "publisher": "alm-rangers",
+  "publisher": "ms-devlabs",
   "name": "Folder Management",
-  "description": "Create new folders from the code explorer within the Team Web Access.",
+  "description": "Create new folders from the code explorer within the VSO Team Web Access.",
   "public": true,
   "icons": {
     "default": "images/VSO-Folder-196x.png"
@@ -38,22 +38,22 @@
   },
   "links": {
     "home": {
-        "uri": "http://aka.ms/vsoext1"
+      "uri": "http://aka.ms/vsoext1"
     },
     "getstarted": {
-        "uri": "http://aka.ms/vsoext1"
+      "uri": "http://aka.ms/vsoext1"
     },
     "support": {
-        "uri": "http://aka.ms/vsarcontact"
+      "uri": "http://aka.ms/vsarcontact"
     },
     "repository": {
-        "uri": "http://aka.ms/vsoext1"
+      "uri": "http://aka.ms/vsoext1"
     },
     "issues": {
-        "uri": "http://aka.ms/vsoext1"
+      "uri": "http://aka.ms/vsoext1"
     },
     "learn": {
-        "uri": "http://blogs.msdn.com/b/visualstudioalmrangers/archive/2015/07/02/folder-management-visual-studio-online-extension-by-wouter-de-kort.aspx"
+      "uri": "http://blogs.msdn.com/b/visualstudioalmrangers/archive/2015/07/02/folder-management-visual-studio-online-extension-by-wouter-de-kort.aspx"
     }
   },
   "branding": {

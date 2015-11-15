@@ -25,3 +25,4 @@ define(["require", "exports"], function (require, exports) {
     })();
     exports.FolderManager = FolderManager;
 });
+//# sourceMappingURL=FolderManager.js.map

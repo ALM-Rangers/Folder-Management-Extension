@@ -25,7 +25,7 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
                 folderName: $("#folderName").val(),
                 addPlaceHolderFile: this.versionControlType == Main.SourceControl.Git,
                 placeHolderFileName: "_placeHolderFile.md",
-                comment: $("#comment").val(),
+                comment: $("#comment").val()
             };
         };
         AddFolderDialog.prototype.triggerCallbacks = function () {
@@ -72,3 +72,4 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
     });
     VSS.notifyLoadSucceeded();
 });
+//# sourceMappingURL=dialog.js.map

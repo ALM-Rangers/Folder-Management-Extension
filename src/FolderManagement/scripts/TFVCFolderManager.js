@@ -50,7 +50,7 @@ define(["require", "exports", "scripts/FolderManager", "TFS/VersionControl/TfvcR
                         changeType: VCContracts.VersionControlChangeType.Add,
                         item: {
                             path: path + "/" + result.placeHolderFileName,
-                            contentMetadata: { encoding: 65001 },
+                            contentMetadata: { encoding: 65001 }
                         },
                         newContent: {
                             content: "Placeholder file for new folder",
@@ -66,3 +66,4 @@ define(["require", "exports", "scripts/FolderManager", "TFS/VersionControl/TfvcR
     })(FolderManager.FolderManager);
     exports.TFVCFolderManager = TFVCFolderManager;
 });
+//# sourceMappingURL=TFVCFolderManager.js.map
