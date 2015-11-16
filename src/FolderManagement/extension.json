@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "publisher": "ms-devlabs",
   "name": "Folder Management",
-  "description": "Create new folders from the code explorer within the VSO Team Web Access.",
+  "description": "Quickly create a folder in your Visual Studio Online source repositories from the web. No need to clone the repository locally or install extra tools.",
   "public": true,
   "icons": {
     "default": "images/VSO-Folder-196x.png"
@@ -20,14 +20,6 @@
     "Git",
     "TFVC"
   ],
-  "screenshots": [
-    {
-      "path": "screenshots/screen1.png"
-    },
-    {
-      "path": "screenshots/screen2.png"
-    }
-  ],
   "content": {
     "details": {
       "path": "overview.md"
@@ -37,9 +29,6 @@
     }
   },
   "links": {
-    "home": {
-      "uri": "http://aka.ms/vsoext1"
-    },
     "getstarted": {
       "uri": "http://aka.ms/vsoext1"
     },
@@ -50,7 +39,7 @@
       "uri": "http://aka.ms/vsoext1"
     },
     "issues": {
-      "uri": "http://aka.ms/vsoext1"
+      "uri": "https://github.com/ALM-Rangers/VSO-Extension-FolderManagement/issues"
     },
     "learn": {
       "uri": "http://blogs.msdn.com/b/visualstudioalmrangers/archive/2015/07/02/folder-management-visual-studio-online-extension-by-wouter-de-kort.aspx"

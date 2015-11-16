@@ -24,6 +24,7 @@
   <ItemGroup>
     <Content Include="css\dialog.css" />
     <Content Include="dialog.html" />
+    <Content Include="images\image1.png" />
     <Content Include="images\show-properties.png" />
     <Content Include="images\VSO-Folder-16x.png" />
     <Content Include="images\VSO-Folder-196x.png" />
@@ -65,7 +66,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="screenshots\" />
-    <Folder Include="scripts\ref\" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>

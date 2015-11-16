@@ -1,21 +1,24 @@
+## Create folders without cloning ##
 
-The **Folder Management** extension provides folder management features in your Visual Studio Online account, such as *easily creating new folders* in Git and TFVC repos.
+In Visual Studio Online you can add, edit, and delete files right from the web. However, if you need to add files or move existing files to a new folder, you must clone (or check out) the source repository locally, make the change, and commit it back to the server. With this extension you can now quickly create a folder right from the web. This is especially useful for non-developers used to working in the web.
 
-**How to use**
+![Create a new folder](images/image1.png)
 
-1. Connect to your team project.
-1. Select **CODE**.
-1. Select the context menu of the folder node, in the left tree view.
-1. Select **Create a new folder**.
-1. Specify a folder name and an optional checkin comment, and click on **Create**.
-	- As empty folders are not allowed with Git, a file called `_placeholder.md` is added as part of the folder creation. 
-	- TFVC currently has the same behaviour for consistency.
-	- You can create nested folders by using `/`. For example, `MyNewFolder/MyNestedFolder`, creates the `_placeholder.md` file in the `MyNestedFolder` folder.
-1. The folder and placeholder file are created.
+Works with both Git and Team Foundation Version Control source repositories.
 
-**Learn more about this extension**
+## Quick steps to get started ##
 
-The source to this extension is available on GitHub: [VSO-Extension-FolderManagement](https://github.com/ALM-Rangers/VSO-Extension-FolderManagement). Feel free to take and modify.
+1. From the Code hub, select a folder to create the new folder under.
+1. Right-click and select **Create a new folder**.
+1. Specify a folder name and an optional checkin comment. Click on **Create**.
+1. The new folder and a placeholder file are created.
 
-To learn more about developing an extension for Visual Studio Online, see the [overview of extensions](https://www.visualstudio.com/en-us/integrate/extensions/overview).
+You can create nested folders by using `/`. For example, `MyNewFolder/MyNestedFolder`, creates the placeholder file in the MyNestedFolder folder.
 
+> As empty folders are not allowed with Git, a file called _placeholder.md is added as part of the folder creation. 
+
+## Learn more ##
+
+The [source](https://github.com/ALM-Rangers/VSO-Extension-FolderManagement) to this extension is available. Feel free to take, fork, and extend.
+
+> Microsoft DevLabs is an outlet for experiments from Microsoft, experiments that represent some of the latest ideas around developer tools. Solutions in this category are designed for broad usage, and you are encouraged to use and provide feedback on them; however, these extensions are not supported nor are any commitments made as to their longevity.
