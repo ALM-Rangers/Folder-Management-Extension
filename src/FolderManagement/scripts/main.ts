@@ -23,10 +23,9 @@ export class AddFolderMenu {
     private actionContext;
 
     public execute(actionContext) {
-        var me = this;
-        actionContext.getSourceItemContext().then(function (sourceContext) {
-            me.actionContext = sourceContext;
-            me.showDialog();
+        actionContext.getSourceItemContext().then((sourceContext) => {
+            this.actionContext = sourceContext;
+            this.showDialog();
         });
     }
 
