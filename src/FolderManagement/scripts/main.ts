@@ -23,8 +23,11 @@ export class AddFolderMenu {
     private actionContext;
 
     public execute(actionContext) {
-        this.actionContext = actionContext;
-        this.showDialog();
+        var me = this;
+        actionContext.getSourceItemContext().then(function (sourceContext) {
+            me.actionContext = sourceContext;
+            me.showDialog();
+        });
     }
 
     private getSourceControlType() {
@@ -94,6 +97,6 @@ export class AddFolderMenu {
 }
 
 VSS.register("addFolder", function (context) {
-    return new AddFolderMenu();
+        return new AddFolderMenu();
 });
 VSS.notifyLoadSucceeded();
