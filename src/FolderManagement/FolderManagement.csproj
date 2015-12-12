@@ -10,7 +10,7 @@
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
-    <TypeScriptToolsVersion>1.6</TypeScriptToolsVersion>
+    <TypeScriptToolsVersion>1.7</TypeScriptToolsVersion>
     <UseIISExpress>true</UseIISExpress>
     <IISExpressSSLPort>44300</IISExpressSSLPort>
     <IISExpressAnonymousAuthentication />
@@ -51,7 +51,7 @@
     <TypeScriptCompile Include="scripts\TFVCFolderManager.ts" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="extension.json" />
+    <Content Include="vss-extension.json" />
     <Content Include="vwd.webinfo" />
     <Content Include="extension.me.json" />
     <None Include="web.Debug.config">

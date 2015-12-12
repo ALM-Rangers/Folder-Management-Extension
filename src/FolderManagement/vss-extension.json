@@ -1,7 +1,7 @@
 ﻿{
   "manifestVersion": 1,
   "id": "FolderManagement",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "ms-devlabs",
   "name": "Folder Management",
   "description": "Quickly create a folder in your Visual Studio Team Services source repositories from the web. No need to clone the repository locally or install extra tools.",
