@@ -21,8 +21,11 @@ define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderMan
         function AddFolderMenu() {
         }
         AddFolderMenu.prototype.execute = function (actionContext) {
-            this.actionContext = actionContext;
-            this.showDialog();
+            var me = this;
+            actionContext.getSourceItemContext().then(function (sourceContext) {
+                me.actionContext = sourceContext;
+                me.showDialog();
+            });
         };
         AddFolderMenu.prototype.getSourceControlType = function () {
             if (this.actionContext.gitRepository) {
