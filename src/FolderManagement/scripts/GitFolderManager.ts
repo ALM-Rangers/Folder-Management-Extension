@@ -76,10 +76,9 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
 
                 var criteria = <VCContracts.GitQueryCommitsCriteria>{ $top: 1, };
                 
-                // folder doesn't exist, create it
-                gitClient.getCommits(repositoryId, criteria, undefined, undefined, undefined).then(
-                    (commits) => {
-                        var oldCommitId = commits[0].commitId
+                gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(
+                    (refs) => {
+                        var oldCommitId = refs[0].objectId;
 
                         var data = this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
 
