@@ -39,9 +39,8 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
                         }
                     }
                     var criteria = { $top: 1 };
-                    // folder doesn't exist, create it
-                    gitClient.getCommits(repositoryId, criteria, undefined, undefined, undefined).then(function (commits) {
-                        var oldCommitId = commits[0].commitId;
+                    gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(function (refs) {
+                        var oldCommitId = refs[0].objectId;
                         var data = _this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
                         gitClient.createPush(data, repositoryId, undefined).then(function () {
                             _this.refreshBrowserWindow();
