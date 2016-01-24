@@ -17,7 +17,7 @@ import RestClient = require("TFS/VersionControl/TfvcRestClient");
 import VCContracts = require("TFS/VersionControl/Contracts");
 
 export class TFVCFolderManager extends FolderManager.FolderManager
-    implements FolderManager.IFolderManager {
+    implements FolderManager.IFolderManager { 
 
     constructor(actionContext) {
         super(actionContext);
@@ -36,11 +36,16 @@ export class TFVCFolderManager extends FolderManager.FolderManager
             });
     }
 
+    public checkDuplicateFolder(folderName: string): IPromise<boolean> {
+        var deferred = Q.defer<boolean>();
+        deferred.resolve(false);
+        return deferred.promise;
+    }
+
     private checkFolderExists(
         tfvcClient: RestClient.TfvcHttpClient2_1,
         path: string,
-        itemsMetaData: VCContracts.TfvcItem[])
-    {
+        itemsMetaData: VCContracts.TfvcItem[]) {
         for (var i = 0; i < itemsMetaData.length; i++) {
             var current = itemsMetaData[i];
             if (current.isFolder && current.path.indexOf(path) === 0) {

@@ -10,9 +10,11 @@
 // Base TypeScript class for the Git and TFVC Folder Manager classes.
 // </summary>
 //---------------------------------------------------------------------
+import Q = require("q");
 
 export interface IFolderManager {
-    dialogCallback;
+    dialogCallback; 
+    checkDuplicateFolder(folderName: string): IPromise<boolean>;
 }
 
 export class FolderManager {
@@ -26,8 +28,15 @@ export class FolderManager {
         VSS.getService<IHostNavigationService>(VSS.ServiceIds.Navigation)
             .then((navigationService) => {
                 navigationService.reload();
-        });
+            });
     }
 
+    protected showDuplicateFolderError(folderName: string) {
+        $(".error-container").text("The folder " + folderName + " already exists");
+    }
+
+    protected hideDuplicateFolderError() {
+        $(".error-container").text("");
+    }
 }
     

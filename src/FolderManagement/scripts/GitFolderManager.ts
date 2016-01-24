@@ -16,6 +16,7 @@ import VCContracts = require("TFS/VersionControl/Contracts");
 import RestClient = require("TFS/VersionControl/GitRestClient");
 import Dialog = require("scripts/Dialog");
 import FolderManager = require("scripts/FolderManager");
+import Q = require("q");
 
 export class GitFolderManager extends FolderManager.FolderManager implements FolderManager.IFolderManager {
 
@@ -50,6 +51,43 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
             ]
         }
     }
+    public checkDuplicateFolder(folderName: string): IPromise<boolean> {
+
+        var deferred = Q.defer<boolean>();
+        var actionContext = this.actionContext;
+
+        var repositoryId = actionContext.gitRepository.id;
+        var branchName = actionContext.version;
+        var basePath = this.actionContext.item.path;
+
+        var gitClient = RestClient.getClient();
+
+        var versionDescriptor: VCContracts.GitVersionDescriptor =
+            {
+                version: branchName,
+                versionOptions: VCContracts.GitVersionOptions.None,
+                versionType: VCContracts.GitVersionType.Branch
+            };
+
+        gitClient.getItems(repositoryId, null, null, VCContracts.VersionControlRecursionType.Full, true, false, false, false, versionDescriptor)
+            .then((result) => {
+                if (basePath == "/") basePath = "";
+                var folderPath = basePath + "/" + folderName;
+                for (var i = 0; i < result.length; i++) {
+                    var current = result[i];
+                    if (current.isFolder
+                        && current.path.length <= folderPath.length
+                        && current.path.indexOf(folderPath) === 0) {
+                        deferred.resolve(true);
+                        return;
+                    }
+                }
+
+                deferred.resolve(false);
+
+            });
+        return deferred.promise;
+    }
 
     public dialogCallback: (result: Dialog.IFormInput) => void = (result) => {
         var actionContext = this.actionContext;
@@ -63,30 +101,19 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
 
         var gitClient = RestClient.getClient();
 
-        gitClient.getItems(repositoryId, undefined, basePath, VCContracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(
-            (result) => {
-                // check and see if the folder already exists
-                var folderPath = basePath ? basePath + "/" + folderName : folderName;
-                for (var i = 0; i < result.length; i++) {
-                    var current = result[i];
-                    if (current.isFolder && current.path.indexOf(folderPath) === 0) {
-                        return;
-                    }
-                }
 
-                var criteria = <VCContracts.GitQueryCommitsCriteria>{ $top: 1, };
-                
-                gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(
-                    (refs) => {
-                        var oldCommitId = refs[0].objectId;
+        var criteria = <VCContracts.GitQueryCommitsCriteria>{ $top: 1, };
 
-                        var data = this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+        gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(
+            (refs) => {
+                var oldCommitId = refs[0].objectId;
 
-                        (<any>gitClient).createPush(data, repositoryId, undefined).then(
-                            () => {
-                                this.refreshBrowserWindow();
-                            });
+                var data = this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+
+                (<any>gitClient).createPush(data, repositoryId, undefined).then(
+                    () => {
+                        this.refreshBrowserWindow();
                     });
             });
-    }
+    };
 }

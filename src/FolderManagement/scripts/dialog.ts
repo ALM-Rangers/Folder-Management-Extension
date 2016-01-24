@@ -10,9 +10,8 @@
 // TypeScript class for the dialog. Handles user input and returns this to the callback.
 // <summary>
 //--------------------------------------------------------------------- 
-
-/// <reference path='ref/VSS.d.ts' />
 import Main = require("scripts/main");
+import FolderManager = require("scripts/FolderManager")
 
 export interface IFormInput {
     folderName: string;
@@ -26,12 +25,14 @@ export class AddFolderDialog {
     constructor() {
         $("#folderName").on('input propertychange paste', () => {
             this.triggerCallbacks();
-        });        
+        });
     }
 
     private formChangedCallbacks = [];
     private stateChangedCallback = [];
     private versionControlType: Main.SourceControl;
+    private folderManager: FolderManager.IFolderManager;
+
 
     private getFormInput(): IFormInput {
         return {
@@ -50,7 +51,7 @@ export class AddFolderDialog {
 
         this.validateState();
     }
-    
+
     private validateState() {
         var formInput = this.getFormInput();
 
@@ -65,14 +66,36 @@ export class AddFolderDialog {
             isValid = false;
         }
 
+        if (!isValid) {
+            this.stateChanged(false);
+        }
+        else {
+            this.folderManager.checkDuplicateFolder(formInput.folderName).then((isDuplicate) => {
+                if (isDuplicate) {
+                    this.stateChanged(false);
+                    $(".error-container").text(formInput.folderName + " already exists");
+                }
+                else {
+                    this.stateChanged(true);
+                    $(".error-container").hide();
+                }
+
+            })
+        }
+    }
+
+    private stateChanged(state) {
         this.stateChangedCallback.forEach(function (callback) {
-            callback(isValid);
+            callback(state);
         });
     }
 
-
     public getFormInputs() {
         return this.getFormInput();
+    }
+    public setFolderManager(folderManager: FolderManager.IFolderManager) {
+        this.folderManager = folderManager;
+
     }
     public setVersionControl(type: Main.SourceControl) {
         this.versionControlType = type;
@@ -87,6 +110,10 @@ export class AddFolderDialog {
     }
     public onStateChanged(callback) {
         this.stateChangedCallback.push(callback);
+    }
+
+    public initialValidate() {
+        this.triggerCallbacks();
     }
 }
 

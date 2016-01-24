@@ -10,16 +10,13 @@
 // TypeScript class that adds the menu action and shows the dialog.
 // </summary>
 //---------------------------------------------------------------------
-
-/// <reference path='ref/VSS.d.ts' />
-
 import GitFolderManager = require("scripts/GitFolderManager");
 import TFVCFolderManager = require("scripts/TFVCFolderManager");
 import Dialog = require("scripts/dialog");
 
 export enum SourceControl { Git, TFVC };
 
-export class AddFolderMenu {
+export class AddFolderMenu { 
     private actionContext;
 
     public execute(actionContext) {
@@ -37,22 +34,25 @@ export class AddFolderMenu {
             return SourceControl.TFVC
         }
     }
-
+    
     private showDialog() {
         VSS.getService("ms.vss-web.dialog-service").then((dialogSvc: IHostDialogService) => {
             var createNewFolderDialog: Dialog.AddFolderDialog;
             var sourceControlType = this.getSourceControlType();
-
+            
             // contribution info
             var extInfo = VSS.getExtensionContext();
             var dialogContributionId = extInfo.publisherId + "." + extInfo.extensionId + "." + "createNewFolderDialog";
 
             var callBack;
+            var folderManager = null;
             if (sourceControlType == SourceControl.Git) {
-                callBack = new GitFolderManager.GitFolderManager(this.actionContext).dialogCallback;
+                folderManager = new GitFolderManager.GitFolderManager(this.actionContext);
+                callBack = folderManager.dialogCallback;
             }
             else {
-                callBack = new TFVCFolderManager.TFVCFolderManager(this.actionContext).dialogCallback;
+                folderManager = new TFVCFolderManager.TFVCFolderManager(this.actionContext);
+                callBack = folderManager.dialogCallback;
             }
 
             var dialogOptions = {
@@ -72,6 +72,7 @@ export class AddFolderMenu {
                 dialog.getContributionInstance("createNewFolderDialog").then((createNewFolderDialogInstance: Dialog.AddFolderDialog) => {
                     createNewFolderDialog = createNewFolderDialogInstance;
                     createNewFolderDialog.setVersionControl(sourceControlType);
+                    createNewFolderDialog.setFolderManager(folderManager);
 
                     var path = "";
 
@@ -87,8 +88,7 @@ export class AddFolderMenu {
                         dialog.updateOkButton(isValid);
                     });
 
-
-                    dialog.updateOkButton(true);
+                    createNewFolderDialog.initialValidate();
                 });
             })
         })
@@ -96,6 +96,6 @@ export class AddFolderMenu {
 }
 
 VSS.register("addFolder", function (context) {
-        return new AddFolderMenu();
+    return new AddFolderMenu();
 });
 VSS.notifyLoadSucceeded();
