@@ -77,7 +77,7 @@ export class AddFolderDialog {
                 }
                 else {
                     this.stateChanged(true);
-                    $(".error-container").hide();
+                    $(".error-container").text("");
                 }
 
             })
