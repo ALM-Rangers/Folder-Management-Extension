@@ -1,15 +1,3 @@
-//---------------------------------------------------------------------
-// <copyright file="FolderManager.ts">
-//    This code is licensed under the MIT License.
-//    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
-//    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
-//    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
-//    PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// </copyright>
-// <summary>
-// Base TypeScript class for the Git and TFVC Folder Manager classes.
-// </summary>
-//---------------------------------------------------------------------
 define(["require", "exports"], function (require, exports) {
     var FolderManager = (function () {
         function FolderManager(actionContext) {
@@ -20,6 +8,12 @@ define(["require", "exports"], function (require, exports) {
                 .then(function (navigationService) {
                 navigationService.reload();
             });
+        };
+        FolderManager.prototype.showDuplicateFolderError = function (folderName) {
+            $(".error-container").text("The folder " + folderName + " already exists");
+        };
+        FolderManager.prototype.hideDuplicateFolderError = function () {
+            $(".error-container").text("");
         };
         return FolderManager;
     })();

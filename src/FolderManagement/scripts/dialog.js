@@ -1,23 +1,16 @@
-//---------------------------------------------------------------------
-// <copyright file="dialog.ts">
-//    This code is licensed under the MIT License.
-//    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
-//    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
-//    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
-//    PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// </copyright>
-// <summary>
-// TypeScript class for the dialog. Handles user input and returns this to the callback.
-// <summary>
-//--------------------------------------------------------------------- 
 define(["require", "exports", "scripts/main"], function (require, exports, Main) {
     var AddFolderDialog = (function () {
         function AddFolderDialog() {
             var _this = this;
             this.formChangedCallbacks = [];
             this.stateChangedCallback = [];
-            $("#folderName").on('input propertychange paste', function () {
-                _this.triggerCallbacks();
+            $("#folderName").on('input propertychange paste', function (event) {
+                if (window.event && event.type == "propertychange" && event.propertyName != "value")
+                    return;
+                window.clearTimeout($(_this).data("timeout"));
+                $(_this).data("timeout", setTimeout(function () {
+                    _this.triggerCallbacks();
+                }, 500));
             });
         }
         AddFolderDialog.prototype.getFormInput = function () {
@@ -36,6 +29,7 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
             this.validateState();
         };
         AddFolderDialog.prototype.validateState = function () {
+            var _this = this;
             var formInput = this.getFormInput();
             var isValid = true;
             if (!formInput.folderName
@@ -45,12 +39,34 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
             if (formInput.folderName.indexOf('\\') > -1) {
                 isValid = false;
             }
+            if (!isValid) {
+                this.stateChanged(false);
+            }
+            else {
+                this.folderManager.checkDuplicateFolder(formInput.folderName).then(function (isDuplicate) {
+                    if (isDuplicate) {
+                        _this.stateChanged(false);
+                        $(".error-container").text(formInput.folderName + " already exists");
+                        $(".error-container").css('visibility', 'visible');
+                        $(".error-container").show();
+                    }
+                    else {
+                        _this.stateChanged(true);
+                        $(".error-container").hide();
+                    }
+                });
+            }
+        };
+        AddFolderDialog.prototype.stateChanged = function (state) {
             this.stateChangedCallback.forEach(function (callback) {
-                callback(isValid);
+                callback(state);
             });
         };
         AddFolderDialog.prototype.getFormInputs = function () {
             return this.getFormInput();
+        };
+        AddFolderDialog.prototype.setFolderManager = function (folderManager) {
+            this.folderManager = folderManager;
         };
         AddFolderDialog.prototype.setVersionControl = function (type) {
             this.versionControlType = type;
@@ -63,6 +79,9 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
         };
         AddFolderDialog.prototype.onStateChanged = function (callback) {
             this.stateChangedCallback.push(callback);
+        };
+        AddFolderDialog.prototype.initialValidate = function () {
+            this.triggerCallbacks();
         };
         return AddFolderDialog;
     })();

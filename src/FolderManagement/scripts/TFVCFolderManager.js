@@ -15,7 +15,7 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", "scripts/FolderManager", "TFS/VersionControl/TfvcRestClient", "TFS/VersionControl/Contracts"], function (require, exports, FolderManager, RestClient, VCContracts) {
+define(["require", "exports", "scripts/FolderManager", "TFS/VersionControl/TfvcRestClient", "TFS/VersionControl/Contracts", "q"], function (require, exports, FolderManager, RestClient, VCContracts, Q) {
     var TFVCFolderManager = (function (_super) {
         __extends(TFVCFolderManager, _super);
         function TFVCFolderManager(actionContext) {
@@ -24,14 +24,41 @@ define(["require", "exports", "scripts/FolderManager", "TFS/VersionControl/TfvcR
             this.dialogCallback = function (result) {
                 var tfvcClient = RestClient.getClient();
                 var path = _this.actionContext.item.path + "/" + result.folderName;
-                var vsoContext = VSS.getWebContext();
-                tfvcClient.getItems(undefined, path, VCContracts.VersionControlRecursionType.OneLevel, false, undefined).then(function (itemsMetaData) {
-                    if (_this.checkFolderExists(tfvcClient, path, itemsMetaData))
-                        return;
-                    _this.createNewFolder(tfvcClient, path, result);
+                var data = {
+                    comment: result.comment,
+                    changes: [
+                        {
+                            changeType: VCContracts.VersionControlChangeType.Add,
+                            item: {
+                                path: path + "/" + result.placeHolderFileName,
+                                contentMetadata: { encoding: 65001 }
+                            },
+                            newContent: {
+                                content: "Placeholder file for new folder",
+                                contentType: VCContracts.ItemContentType.RawText
+                            }
+                        }]
+                };
+                tfvcClient.createChangeset(data).then(function () {
+                    _this.refreshBrowserWindow();
                 });
             };
         }
+        TFVCFolderManager.prototype.checkDuplicateFolder = function (folderName) {
+            var _this = this;
+            var deferred = Q.defer();
+            var tfvcClient = RestClient.getClient();
+            var path = this.actionContext.item.path + "/" + folderName;
+            tfvcClient.getItems(undefined, path, VCContracts.VersionControlRecursionType.OneLevel, false, undefined).then(function (itemsMetaData) {
+                if (_this.checkFolderExists(tfvcClient, path, itemsMetaData)) {
+                    deferred.resolve(true);
+                }
+                else {
+                    deferred.resolve(false);
+                }
+            });
+            return deferred.promise;
+        };
         TFVCFolderManager.prototype.checkFolderExists = function (tfvcClient, path, itemsMetaData) {
             for (var i = 0; i < itemsMetaData.length; i++) {
                 var current = itemsMetaData[i];
@@ -40,27 +67,6 @@ define(["require", "exports", "scripts/FolderManager", "TFS/VersionControl/TfvcR
                 }
             }
             return false;
-        };
-        TFVCFolderManager.prototype.createNewFolder = function (tfvcClient, path, result) {
-            var _this = this;
-            var data = {
-                comment: result.comment,
-                changes: [
-                    {
-                        changeType: VCContracts.VersionControlChangeType.Add,
-                        item: {
-                            path: path + "/" + result.placeHolderFileName,
-                            contentMetadata: { encoding: 65001 }
-                        },
-                        newContent: {
-                            content: "Placeholder file for new folder",
-                            contentType: VCContracts.ItemContentType.RawText
-                        }
-                    }]
-            };
-            tfvcClient.createChangeset(data).then(function () {
-                _this.refreshBrowserWindow();
-            });
         };
         return TFVCFolderManager;
     })(FolderManager.FolderManager);

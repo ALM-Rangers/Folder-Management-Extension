@@ -14,7 +14,7 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionControl/GitRestClient", "scripts/FolderManager"], function (require, exports, VCContracts, RestClient, FolderManager) {
+define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionControl/GitRestClient", "scripts/FolderManager", "q"], function (require, exports, VCContracts, RestClient, FolderManager, Q) {
     var GitFolderManager = (function (_super) {
         __extends(GitFolderManager, _super);
         function GitFolderManager(actionContext) {
@@ -29,22 +29,12 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
                 var basePath = _this.actionContext.item ? _this.actionContext.item.path : "";
                 var comment = result.comment;
                 var gitClient = RestClient.getClient();
-                gitClient.getItems(repositoryId, undefined, basePath, VCContracts.VersionControlRecursionType.Full, true, undefined, undefined, undefined, undefined).then(function (result) {
-                    // check and see if the folder already exists
-                    var folderPath = basePath ? basePath + "/" + folderName : folderName;
-                    for (var i = 0; i < result.length; i++) {
-                        var current = result[i];
-                        if (current.isFolder && current.path.indexOf(folderPath) === 0) {
-                            return;
-                        }
-                    }
-                    var criteria = { $top: 1 };
-                    gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(function (refs) {
-                        var oldCommitId = refs[0].objectId;
-                        var data = _this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
-                        gitClient.createPush(data, repositoryId, undefined).then(function () {
-                            _this.refreshBrowserWindow();
-                        });
+                var criteria = { $top: 1 };
+                gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(function (refs) {
+                    var oldCommitId = refs[0].objectId;
+                    var data = _this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+                    gitClient.createPush(data, repositoryId, undefined).then(function () {
+                        _this.refreshBrowserWindow();
                     });
                 });
             };
@@ -75,6 +65,36 @@ define(["require", "exports", "TFS/VersionControl/Contracts", "TFS/VersionContro
                     }
                 ]
             };
+        };
+        GitFolderManager.prototype.checkDuplicateFolder = function (folderName) {
+            var deferred = Q.defer();
+            var actionContext = this.actionContext;
+            var repositoryId = actionContext.gitRepository.id;
+            var branchName = actionContext.version;
+            var basePath = this.actionContext.item.path;
+            var gitClient = RestClient.getClient();
+            var versionDescriptor = {
+                version: branchName,
+                versionOptions: VCContracts.GitVersionOptions.None,
+                versionType: VCContracts.GitVersionType.Branch
+            };
+            gitClient.getItems(repositoryId, null, null, VCContracts.VersionControlRecursionType.Full, true, false, false, false, versionDescriptor)
+                .then(function (result) {
+                if (basePath == "/")
+                    basePath = "";
+                var folderPath = basePath + "/" + folderName;
+                for (var i = 0; i < result.length; i++) {
+                    var current = result[i];
+                    if (current.isFolder
+                        && current.path.length <= folderPath.length
+                        && current.path.indexOf(folderPath) === 0) {
+                        deferred.resolve(true);
+                        return;
+                    }
+                }
+                deferred.resolve(false);
+            });
+            return deferred.promise;
         };
         return GitFolderManager;
     })(FolderManager.FolderManager);
