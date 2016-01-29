@@ -23,8 +23,14 @@ export interface IFormInput {
 export class AddFolderDialog {
 
     constructor() {
-        $("#folderName").on('input propertychange paste', () => {
-            this.triggerCallbacks();
+        $("#folderName").on('input propertychange paste', (event: any) => {
+            if (window.event && event.type == "propertychange" && event.propertyName != "value")
+                return;
+
+            window.clearTimeout((<any>$(this).data("timeout")));
+            $(this).data("timeout", setTimeout(() => {
+                this.triggerCallbacks();
+            }, 500));
         });
     }
 
@@ -74,12 +80,13 @@ export class AddFolderDialog {
                 if (isDuplicate) {
                     this.stateChanged(false);
                     $(".error-container").text(formInput.folderName + " already exists");
+                    $(".error-container").css('visibility', 'visible');
+                    $(".error-container").show();
                 }
                 else {
                     this.stateChanged(true);
-                    $(".error-container").text("");
+                    $(".error-container").hide();
                 }
-
             })
         }
     }
