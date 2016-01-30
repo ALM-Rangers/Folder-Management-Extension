@@ -1,15 +1,3 @@
-//---------------------------------------------------------------------
-// <copyright file="main.ts">
-//    This code is licensed under the MIT License.
-//    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
-//    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
-//    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
-//    PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// </copyright>
-// <summary>
-// TypeScript class that adds the menu action and shows the dialog.
-// </summary>
-//---------------------------------------------------------------------
 define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderManager"], function (require, exports, GitFolderManager, TFVCFolderManager) {
     (function (SourceControl) {
         SourceControl[SourceControl["Git"] = 0] = "Git";
@@ -44,11 +32,14 @@ define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderMan
                 var extInfo = VSS.getExtensionContext();
                 var dialogContributionId = extInfo.publisherId + "." + extInfo.extensionId + "." + "createNewFolderDialog";
                 var callBack;
+                var folderManager = null;
                 if (sourceControlType == SourceControl.Git) {
-                    callBack = new GitFolderManager.GitFolderManager(_this.actionContext).dialogCallback;
+                    folderManager = new GitFolderManager.GitFolderManager(_this.actionContext);
+                    callBack = folderManager.dialogCallback;
                 }
                 else {
-                    callBack = new TFVCFolderManager.TFVCFolderManager(_this.actionContext).dialogCallback;
+                    folderManager = new TFVCFolderManager.TFVCFolderManager(_this.actionContext);
+                    callBack = folderManager.dialogCallback;
                 }
                 var dialogOptions = {
                     title: "Create new folder",
@@ -66,6 +57,7 @@ define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderMan
                     dialog.getContributionInstance("createNewFolderDialog").then(function (createNewFolderDialogInstance) {
                         createNewFolderDialog = createNewFolderDialogInstance;
                         createNewFolderDialog.setVersionControl(sourceControlType);
+                        createNewFolderDialog.setFolderManager(folderManager);
                         var path = "";
                         if (sourceControlType == SourceControl.Git) {
                             path = _this.actionContext.gitRepository.name + _this.actionContext.item.path;
@@ -77,7 +69,7 @@ define(["require", "exports", "scripts/GitFolderManager", "scripts/TFVCFolderMan
                         createNewFolderDialog.onStateChanged(function (isValid) {
                             dialog.updateOkButton(isValid);
                         });
-                        dialog.updateOkButton(true);
+                        createNewFolderDialog.initialValidate();
                     });
                 });
             });
