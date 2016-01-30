@@ -79,7 +79,7 @@ export class AddFolderDialog {
             this.folderManager.checkDuplicateFolder(formInput.folderName).then((isDuplicate) => {
                 if (isDuplicate) {
                     this.stateChanged(false);
-                    $(".error-container").text(formInput.folderName + " already exists");
+                    $(".error-container").text("A folder with the name " + formInput.folderName + " already exists");
                     $(".error-container").css('visibility', 'visible');
                     $(".error-container").show();
                 }
