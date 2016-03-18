@@ -46,7 +46,7 @@ define(["require", "exports", "scripts/main"], function (require, exports, Main)
                 this.folderManager.checkDuplicateFolder(formInput.folderName).then(function (isDuplicate) {
                     if (isDuplicate) {
                         _this.stateChanged(false);
-                        $(".error-container").text(formInput.folderName + " already exists");
+                        $(".error-container").text("A folder with the name " + formInput.folderName + " already exists");
                         $(".error-container").css('visibility', 'visible');
                         $(".error-container").show();
                     }
