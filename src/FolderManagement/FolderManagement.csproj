@@ -10,7 +10,6 @@
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
-    <TypeScriptToolsVersion>1.7</TypeScriptToolsVersion>
     <UseIISExpress>true</UseIISExpress>
     <IISExpressSSLPort>44300</IISExpressSSLPort>
     <IISExpressAnonymousAuthentication />
@@ -24,6 +23,7 @@
   <ItemGroup>
     <Content Include="css\dialog.css" />
     <Content Include="dialog.html" />
+    <Content Include="gruntfile.js" />
     <Content Include="images\image1.png" />
     <Content Include="images\show-properties.png" />
     <Content Include="images\VSO-Folder-16x.png" />
@@ -31,6 +31,8 @@
     <Content Include="images\VSO-Folder-wide.png" />
     <Content Include="main.html" />
     <Content Include="license.txt" />
+    <Content Include="screenshots\Screen1.png" />
+    <Content Include="screenshots\Screen2.png" />
     <Content Include="sdk\scripts\VSS.SDK.js" />
     <Content Include="web.config" />
   </ItemGroup>
@@ -39,16 +41,16 @@
     <TypeScriptCompile Include="scripts\FolderManager.ts" />
     <TypeScriptCompile Include="scripts\GitFolderManager.ts" />
     <TypeScriptCompile Include="scripts\main.ts" />
-    <TypeScriptCompile Include="scripts\ref\jquery.d.ts" />
-    <TypeScriptCompile Include="scripts\ref\knockout.d.ts" />
-    <TypeScriptCompile Include="scripts\ref\q.d.ts" />
-    <TypeScriptCompile Include="scripts\ref\VSS.d.ts" />
     <TypeScriptCompile Include="scripts\TFVCFolderManager.ts" />
+    <TypeScriptCompile Include="typings\main.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="vss-extension.json" />
     <Content Include="vwd.webinfo" />
     <Content Include="extension.me.json" />
+    <Content Include="package.json" />
+    <Content Include="marketplace\mp_terms.md" />
+    <Content Include="typings.json" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
@@ -59,9 +61,7 @@
   <ItemGroup>
     <None Include="overview.md" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="screenshots\" />
-  </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>

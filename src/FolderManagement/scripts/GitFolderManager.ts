@@ -1,4 +1,5 @@
-﻿//---------------------------------------------------------------------
+﻿/// <reference path="../typings/main.d.ts" />
+//---------------------------------------------------------------------
 // <copyright file="GitFolderManager.ts">
 //    This code is licensed under the MIT License.
 //    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 

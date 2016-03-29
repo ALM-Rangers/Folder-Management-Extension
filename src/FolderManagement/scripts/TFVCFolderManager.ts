@@ -1,4 +1,5 @@
-﻿//---------------------------------------------------------------------
+﻿/// <reference path="../typings/main.d.ts" />
+//---------------------------------------------------------------------
 // <copyright file="TFVCFolderManager.ts">
 //    This code is licensed under the MIT License.
 //    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
@@ -74,7 +75,7 @@ export class TFVCFolderManager extends FolderManager.FolderManager
     }
 
     private checkFolderExists(
-        tfvcClient: RestClient.TfvcHttpClient2_1,
+        tfvcClient: RestClient.TfvcHttpClient3,
         path: string,
         itemsMetaData: VCContracts.TfvcItem[]) {
         for (var i = 0; i < itemsMetaData.length; i++) {

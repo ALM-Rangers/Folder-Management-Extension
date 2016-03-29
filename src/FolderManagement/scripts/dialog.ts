@@ -1,3 +1,4 @@
+/// <reference path="../typings/main.d.ts" />
 //---------------------------------------------------------------------
 // <copyright file="dialog.ts">
 //    This code is licensed under the MIT License.

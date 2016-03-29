@@ -1,3 +1,10 @@
 src/.vs
 obj/
 bin/
+node_modules/
+npm-debug.log
+typings/
+/src/FolderManagement/scripts/*.js
+/src/FolderManagement/scripts/*.map
+
+*.vsix
