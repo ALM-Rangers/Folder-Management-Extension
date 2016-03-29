@@ -3,7 +3,7 @@
   <PropertyGroup>
     <ProjectView>ShowAllFiles</ProjectView>
     <NameOfLastUsedPublishProfile>foldermanagement</NameOfLastUsedPublishProfile>
-    <ToolsVersionPromptShown>1.7</ToolsVersionPromptShown>
+    <ToolsVersionPromptShown>1.8</ToolsVersionPromptShown>
   </PropertyGroup>
   <ProjectExtensions>
     <VisualStudio>
