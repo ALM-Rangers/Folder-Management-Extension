@@ -5,8 +5,7 @@
   "keywords": [
     "vsts",
     "tfs"
-  ],
-  
+  ],  
   "author": "ALM Rangers",
   "license": "MIT",
   "devDependencies": {
@@ -18,10 +17,9 @@
     "requirejs": "2.1.22",
     "tfx-cli": "^0.3.19",
     "tsconfig-glob": "^0.4.0",
-    "tsd": "~0.6.5",
     "typescript": "^1.7.5",
     "typings": "^0.6.6",
     "vset": "^0.4.24",
-    "vss-sdk": "^0.91.3"
+    "vss-web-extension-sdk": "^1.96.1"
   }
 }
