@@ -31,11 +31,6 @@
     <Content Include="images\VSO-Folder-wide.png" />
     <Content Include="main.html" />
     <Content Include="license.txt" />
-    <Content Include="scripts\dialog.js" />
-    <Content Include="scripts\FolderManager.js" />
-    <Content Include="scripts\GitFolderManager.js" />
-    <Content Include="scripts\main.js" />
-    <Content Include="scripts\TFVCFolderManager.js" />
     <Content Include="sdk\scripts\VSS.SDK.js" />
     <Content Include="web.config" />
   </ItemGroup>
