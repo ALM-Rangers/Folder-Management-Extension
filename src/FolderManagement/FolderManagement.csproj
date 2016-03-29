@@ -47,7 +47,6 @@
   <ItemGroup>
     <Content Include="vss-extension.json" />
     <Content Include="vwd.webinfo" />
-    <Content Include="extension.me.json" />
     <Content Include="package.json" />
     <Content Include="marketplace\mp_terms.md" />
     <Content Include="typings.json" />
