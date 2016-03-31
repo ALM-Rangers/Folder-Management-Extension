@@ -13,7 +13,7 @@
                 stderr: true
             },
             initdev: {
-                command: "npm install && typings install ",
+                command: "typings install ",
                 stdout: true,
                 stderr: true
             }
