@@ -9,7 +9,7 @@
   "scripts": {
     "initdev": "typings install",
     "copyfiles": "copyfiles -f node_modules/vss-sdk/lib/VSS.SDK.js node_modules/jquery/dist/jquery.min.js scripts/lib",
-    "run": "initdev && copyfiles",
+    "setup": "npm run initdev && npm run copyfiles",
     "package": "tfx extension create --manifest-globs vss-extension.json",
     "publish": "tfx extension publish --token <token> --manifest-globs vss-extension.json"
   },

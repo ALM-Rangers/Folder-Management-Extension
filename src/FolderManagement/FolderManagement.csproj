@@ -23,7 +23,6 @@
   <ItemGroup>
     <Content Include="css\dialog.css" />
     <Content Include="dialog.html" />
-    <Content Include="gruntfile.js" />
     <Content Include="images\image1.png" />
     <Content Include="images\show-properties.png" />
     <Content Include="images\VSO-Folder-16x.png" />

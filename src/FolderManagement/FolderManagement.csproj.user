@@ -4,6 +4,8 @@
     <ProjectView>ShowAllFiles</ProjectView>
     <NameOfLastUsedPublishProfile>foldermanagement</NameOfLastUsedPublishProfile>
     <ToolsVersionPromptShown>1.8</ToolsVersionPromptShown>
+    <UseIISExpress>true</UseIISExpress>
+    <IISExpressSSLPort>44300</IISExpressSSLPort>
   </PropertyGroup>
   <ProjectExtensions>
     <VisualStudio>
