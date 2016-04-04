@@ -37,11 +37,7 @@ export class TFVCFolderManager extends FolderManager.FolderManager
                     changeType: VCContracts.VersionControlChangeType.Add,
                     item: {
                         path: path + "/" + result.placeHolderFileName,
-                        contentMetadata: { encoding: 65001 },
-                    },
-                    newContent: {
-                        content: "Placeholder file for new folder",
-                        contentType: VCContracts.ItemContentType.RawText
+                        isFolder: true
                     }
                 }]
         };

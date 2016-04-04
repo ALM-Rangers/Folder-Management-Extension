@@ -107,6 +107,10 @@ export class AddFolderDialog {
     }
     public setVersionControl(type: Main.SourceControl) {
         this.versionControlType = type;
+
+        if (type === Main.SourceControl.TFVC) {
+            $(".git-file").html("<br/>");
+        }
     }
 
     public setCurrentPath(path: string) {
