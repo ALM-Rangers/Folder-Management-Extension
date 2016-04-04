@@ -47,7 +47,6 @@
     <Content Include="vss-extension.json" />
     <Content Include="vwd.webinfo" />
     <Content Include="package.json" />
-    <Content Include="node_modules\marketplace\mp_terms.md" />
     <Content Include="typings.json" />
     <Content Include="marketplace\mp_terms.md" />
     <None Include="web.Debug.config">

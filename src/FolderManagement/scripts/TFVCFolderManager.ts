@@ -36,7 +36,7 @@ export class TFVCFolderManager extends FolderManager.FolderManager
                 {
                     changeType: VCContracts.VersionControlChangeType.Add,
                     item: {
-                        path: path + "/" + result.placeHolderFileName,
+                        path: path,
                         isFolder: true
                     }
                 }]
