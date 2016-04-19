@@ -11,7 +11,8 @@ Works with both Git and Team Foundation Version Control source repositories.
 1. From the Code hub, select a folder to create the new folder under.
 1. Right-click and select **Create a new folder**.
 1. Specify a folder name and an optional checkin comment. Click on **Create**.
-1. The new folder and a placeholder file are created.
+1. The new folder is created.
+1. (Git only) A placeholder file is added.
 
 You can create nested folders by using `/`. For example, `MyNewFolder/MyNestedFolder`, creates the placeholder file in the MyNestedFolder folder.
 
