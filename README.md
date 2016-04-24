@@ -30,3 +30,11 @@ Check out [Wouter de Kort's](http://blogs.msdn.com/b/willy-peter_schaub/archive/
     </td>
   </tr>
 </table>
+
+###Contribute
+Contributions to Print Cards are welcome. Here is how you can contribute to Print Cards:  
+
+- Submit bugs and help us verify fixes  
+- Submit pull requests for bug fixes and features and discuss existing proposals   
+
+Please refer to [Contribution guidelines](.github/CONTRIBUTING.md) and the [Code of Conduct](.github/COC.md) for more details.
