@@ -110,7 +110,7 @@ export class AddFolderDialog {
         this.versionControlType = type;
 
         if (type === Main.SourceControl.TFVC
-            && !Context.getPageContext().webAccessConfiguration.isHosted) { // added because TFS 2015.2 doesn't have the REST api yet for adding an empty folder. Remove in future version
+            && Context.getPageContext().webAccessConfiguration.isHosted) { // added because TFS 2015.2 doesn't have the REST api yet for adding an empty folder. Remove in future version
             $(".git-file").html("<br/>");
         }
     }
