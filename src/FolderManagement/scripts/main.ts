@@ -99,7 +99,6 @@ export class AddFolderMenu {
 }
 
 VSS.register("addFolder", function (context) {
-    TelemetryClient.TelemetryClient.getClient().trackEvent("Add_Folder_Menu_Item_Shown");
     return new AddFolderMenu();
 });
 VSS.notifyLoadSucceeded();

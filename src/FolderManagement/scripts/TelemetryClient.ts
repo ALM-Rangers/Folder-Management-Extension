@@ -1,7 +1,7 @@
 ﻿import Context = require("VSS/Context");
 
 export class TelemetryClient {
-
+                              
     private static DevLabs = "34dcf687-abc9-413a-b8d2-54f85a8496ba";
     private static telemetryClient: TelemetryClient;
     private static ExtensionContext = "FolderManagement";
@@ -15,7 +15,6 @@ export class TelemetryClient {
         }
 
         return this.telemetryClient;
-
     }
 
     private appInsightsClient: Microsoft.ApplicationInsights.AppInsights;
