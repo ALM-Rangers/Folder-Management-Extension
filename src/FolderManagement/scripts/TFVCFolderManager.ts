@@ -14,6 +14,7 @@
 import Context = require("VSS/Context");
 import Dialog = require("scripts/Dialog");
 import FolderManager = require("scripts/FolderManager");
+import TelemetryClient = require("scripts/TelemetryClient");
 import RestClient = require("TFS/VersionControl/TfvcRestClient");
 import VCContracts = require("TFS/VersionControl/Contracts");
 import Q = require("q");
@@ -40,6 +41,7 @@ export class TFVCFolderManager extends FolderManager.FolderManager
 
         (<any>tfvcClient).createChangeset(data).then(
             () => {
+                TelemetryClient.TelemetryClient.getClient().trackEvent("TFVC_Folder_Added");
                 this.refreshBrowserWindow();
             });
     }

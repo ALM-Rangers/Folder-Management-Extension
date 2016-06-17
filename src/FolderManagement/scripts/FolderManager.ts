@@ -12,6 +12,7 @@
 // </summary>
 //---------------------------------------------------------------------
 import Q = require("q");
+import TelemetryClient = require("scripts/TelemetryClient");
 
 export interface IFolderManager {
     dialogCallback; 
@@ -33,10 +34,12 @@ export class FolderManager {
     }
 
     protected showDuplicateFolderError(folderName: string) {
+        TelemetryClient.TelemetryClient.getClient().trackEvent("Duplicate_Folder_Name_Entered");    
         $(".error-container").text("The folder " + folderName + " already exists");
     }
 
     protected hideDuplicateFolderError() {
+        TelemetryClient.TelemetryClient.getClient().trackEvent("Duplicate_Folder_Name_Resolved");
         $(".error-container").text("");
     }
 }

@@ -32,6 +32,7 @@
     <Content Include="license.txt" />
     <Content Include="screenshots\Screen1.png" />
     <Content Include="screenshots\Screen2.png" />
+    <Content Include="scripts\lib\ai.0.21.5-build00175.min.js" />
     <Content Include="sdk\scripts\VSS.SDK.js" />
     <Content Include="web.config" />
   </ItemGroup>
@@ -39,7 +40,9 @@
     <TypeScriptCompile Include="scripts\dialog.ts" />
     <TypeScriptCompile Include="scripts\FolderManager.ts" />
     <TypeScriptCompile Include="scripts\GitFolderManager.ts" />
+    <TypeScriptCompile Include="scripts\lib\ai.0.21.5-build00175.d.ts" />
     <TypeScriptCompile Include="scripts\main.ts" />
+    <TypeScriptCompile Include="scripts\TelemetryClient.ts" />
     <TypeScriptCompile Include="scripts\TFVCFolderManager.ts" />
     <TypeScriptCompile Include="typings\main.d.ts" />
   </ItemGroup>
@@ -59,9 +62,7 @@
   <ItemGroup>
     <None Include="overview.md" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="scripts\lib\" />
-  </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>

@@ -16,6 +16,7 @@
 import VCContracts = require("TFS/VersionControl/Contracts");
 import RestClient = require("TFS/VersionControl/GitRestClient");
 import Dialog = require("scripts/Dialog");
+import TelemetryClient = require("scripts/TelemetryClient");
 import FolderManager = require("scripts/FolderManager");
 import Q = require("q");
 
@@ -52,6 +53,7 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
             ]
         }
     }
+
     public checkDuplicateFolder(folderName: string): IPromise<boolean> {
 
         var deferred = Q.defer<boolean>();
@@ -102,7 +104,6 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
 
         var gitClient = RestClient.getClient();
 
-
         var criteria = <VCContracts.GitQueryCommitsCriteria>{ $top: 1, };
 
         gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(
@@ -113,6 +114,7 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
 
                 (<any>gitClient).createPush(data, repositoryId, undefined).then(
                     () => {
+                        TelemetryClient.TelemetryClient.getClient().trackEvent("Git_Folder_Added");
                         this.refreshBrowserWindow();
                     });
             });
