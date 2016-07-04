@@ -70,7 +70,19 @@ export class AddFolderDialog {
             isValid = false;
         }
 
-        if (formInput.folderName.indexOf('\\') > -1) {
+        var invalidCharactersRegEx = /[<>:"\\|?*\x00-\x1F]|^\\(?:aux|con|clock\$|nul|prn|com[1-9]|lpt[1-9]\\)$/i;
+
+        if (invalidCharactersRegEx.test(formInput.folderName)) {
+            $(".error-container").text("The folder name contains invalid characters");
+            $(".error-container").css('visibility', 'visible');
+            $(".error-container").show();
+            isValid = false;
+        }
+
+        if (formInput.folderName.length > 255) {
+            $(".error-container").text("The folder name cannot be longer than 255 characters");
+            $(".error-container").css('visibility', 'visible');
+            $(".error-container").show();
             isValid = false;
         }
 

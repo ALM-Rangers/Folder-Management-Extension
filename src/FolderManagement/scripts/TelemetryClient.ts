@@ -1,74 +1,106 @@
 ﻿import Context = require("VSS/Context");
 
 export class TelemetryClient {
-                              
-    private static DevLabs = "34dcf687-abc9-413a-b8d2-54f85a8496ba";
-    private static telemetryClient: TelemetryClient;
-    private static ExtensionContext = "FolderManagement";
-    private IsAvailable = false;
 
+    private static telemetryClient: TelemetryClient;
     public static getClient(): TelemetryClient {
         if (!this.telemetryClient) {
             this.telemetryClient = new TelemetryClient();
             this.telemetryClient.Init();
         }
-
         return this.telemetryClient;
     }
 
     private appInsightsClient: Microsoft.ApplicationInsights.AppInsights;
 
     private Init() {
-        var snippet: any = {
-            config: {
-                instrumentationKey: TelemetryClient.DevLabs
-            }
-        };
+        try {
+            var snippet: any = {
+                config: {
+                    instrumentationKey: "34dcf687-abc9-413a-b8d2-54f85a8496ba"
+                }
+            };
+            var x = VSS.getExtensionContext();
 
-        // AI is only supported if hosted at this stage
-        this.IsAvailable = Context.getPageContext().webAccessConfiguration.isHosted;
-
-        if (Context.getPageContext().webAccessConfiguration.isHosted) {
             var init = new Microsoft.ApplicationInsights.Initialization(snippet);
-            var webContext = VSS.getWebContext();
-
             this.appInsightsClient = init.loadAppInsights();
-            this.appInsightsClient.setAuthenticatedUserContext(webContext.user.id, webContext.collection.id);
+
+            var webContext = VSS.getWebContext();
+            this.appInsightsClient.setAuthenticatedUserContext(
+                webContext.user.id, webContext.collection.id);
+        }
+        catch (e) {
+            this.appInsightsClient = null;
+            console.log(e);
+        }
+    }
+
+    public startTrackPageView(name?: string) {
+        try {
+            if (this.appInsightsClient != null) {
+                this.appInsightsClient.startTrackPage(name);
+            }
+        }
+        catch (e) {
+            console.log(e);
+        }
+    }
+
+    public stopTrackPageView(name?: string) {
+        try {
+            if (this.appInsightsClient != null) {
+                this.appInsightsClient.stopTrackPage(name);
+            }
+        }
+        catch (e) {
+            console.log(e);
         }
     }
 
     public trackPageView(name?: string, url?: string, properties?: Object, measurements?: Object, duration?: number) {
-        if (this.IsAvailable) {
-            this.appInsightsClient.trackPageView(TelemetryClient.ExtensionContext + "." + name, url, properties, measurements, duration);
-            this.appInsightsClient.flush();
+        try {
+            if (this.appInsightsClient != null) {
+                this.appInsightsClient.trackPageView("FolderManagement." + name, url, properties, measurements, duration);
+            }
+        }
+        catch (e) {
+            console.log(e);
         }
     }
 
     public trackEvent(name: string, properties?: Object, measurements?: Object) {
-        if (this.IsAvailable) {
-            this.appInsightsClient.trackEvent(TelemetryClient.ExtensionContext + "." + name, properties, measurements);
-            this.appInsightsClient.flush();
+        try {
+            if (this.appInsightsClient != null) {
+                this.appInsightsClient.trackEvent("FolderManagement." + name, properties, measurements);
+                this.appInsightsClient.flush();
+            }
+        }
+        catch (e) {
+            console.log(e);
         }
     }
 
-    public trackException(exceptionMessage: string, handledAt?: string, properties?: Object, measurements?: Object) {
-        if (this.IsAvailable) {
-            console.error(exceptionMessage);
-
-            var error: Error = {
-                name: TelemetryClient.ExtensionContext + "." + handledAt,
-                message: exceptionMessage
-            };
-
-            this.appInsightsClient.trackException(error, handledAt, properties, measurements);
-            this.appInsightsClient.flush();
+    public trackException(exception: Error, handledAt?: string, properties?: Object, measurements?: Object) {
+        try {
+            if (this.appInsightsClient != null) {
+                this.appInsightsClient.trackException(exception, handledAt, properties, measurements);
+                this.appInsightsClient.flush();
+            }
+        }
+        catch (e) {
+            console.log(e);
         }
     }
 
     public trackMetric(name: string, average: number, sampleCount?: number, min?: number, max?: number, properties?: Object) {
-        if (this.IsAvailable) {
-            this.appInsightsClient.trackMetric(TelemetryClient.ExtensionContext + "." + name, average, sampleCount, min, max, properties);
-            this.appInsightsClient.flush();
+        try {
+            if (this.appInsightsClient != null) {
+                this.appInsightsClient.trackMetric("CountdownWidgetFolderManagement." + name, average, sampleCount, min, max, properties);
+                this.appInsightsClient.flush();
+            }
+        }
+        catch (e) {
+            console.log(e);
         }
     }
 
