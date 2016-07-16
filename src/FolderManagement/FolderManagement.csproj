@@ -44,7 +44,6 @@
     <TypeScriptCompile Include="scripts\main.ts" />
     <TypeScriptCompile Include="scripts\TelemetryClient.ts" />
     <TypeScriptCompile Include="scripts\TFVCFolderManager.ts" />
-    <TypeScriptCompile Include="typings\main.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="vss-extension.json" />
