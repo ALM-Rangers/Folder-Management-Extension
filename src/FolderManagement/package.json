@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "initdev": "typings install",
-    "copyfiles": "copyfiles -f node_modules/vss-sdk/lib/VSS.SDK.js node_modules/jquery/dist/jquery.min.js scripts/lib",
+    "copyfiles": "copyfiles -f node_modules/vss-web-extension-sdk/lib/VSS.SDK.js node_modules/jquery/dist/jquery.min.js scripts/lib",
     "setup": "npm run initdev && npm run copyfiles",
     "package": "tfx extension create --manifest-globs vss-extension.json",
     "publish": "tfx extension publish --token <token> --manifest-globs vss-extension.json"
@@ -16,19 +16,19 @@
   "author": "ALM Rangers",
   "license": "MIT",
   "devDependencies": {
-    "copyfiles": "^0.2.1",
-    "grunt": "~0.4.5",
-    "grunt-cli": "^1.1.0",
-    "grunt-contrib-copy": "~0.8.2",
-    "grunt-exec": "~0.4.6",
-    "grunt-typescript": "*",
-    "jquery": "^2.2.2",
-    "requirejs": "2.1.22",
-    "tfx-cli": "^0.3.19",
-    "tsconfig-glob": "^0.4.0",
-    "typescript": "^1.7.5",
-    "typings": "^0.6.6",
+    "copyfiles": "^1.0.0",
+    "grunt": "^1.0.1",
+    "grunt-cli": "^1.2.0",
+    "grunt-contrib-copy": "^1.0.0",
+    "grunt-exec": "^1.0.0",
+    "grunt-typescript": "^0.8.0",
+    "jquery": "^3.1.0",
+    "requirejs": "^2.2.0",
+    "tfx-cli": "^0.3.22",
+    "tsconfig-glob": "^0.4.3",
+    "typescript": "1.8.10",
+    "typings": "^1.3.1",
     "vset": "^0.4.24",
-    "vss-web-extension-sdk": "^1.96.1"
+    "vss-web-extension-sdk": "^1.101.0"
   }
 }
