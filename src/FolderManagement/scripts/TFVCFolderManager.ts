@@ -11,7 +11,7 @@
 // TypeScript class that creates a TFVC folder.
 // </summary>
 //---------------------------------------------------------------------
-
+import Context = require("VSS/Context");
 import Dialog = require("scripts/Dialog");
 import FolderManager = require("scripts/FolderManager");
 import RestClient = require("TFS/VersionControl/TfvcRestClient");
@@ -29,8 +29,41 @@ export class TFVCFolderManager extends FolderManager.FolderManager
         var tfvcClient = RestClient.getClient();
 
         var path = this.actionContext.item.path + "/" + result.folderName;
+        var data;
 
-        var data = {
+        if (Context.getPageContext().webAccessConfiguration.isHosted) {
+            data = this.getDataForHostedVSTS(result, path);
+        }
+        else {
+            data = this.getDataForOnPremesisTFS(result, path);
+        }
+
+        (<any>tfvcClient).createChangeset(data).then(
+            () => {
+                this.refreshBrowserWindow();
+            });
+    }
+
+    private getDataForOnPremesisTFS(result, path) {
+        return {
+            comment: result.comment,
+            changes: [
+                {
+                    changeType: VCContracts.VersionControlChangeType.Add,
+                    item: {
+                        path: path + "/" + result.placeHolderFileName,
+                        contentMetadata: { encoding: 65001 },
+                    },
+                    newContent: {
+                        content: "Placeholder file for new folder",
+                        contentType: VCContracts.ItemContentType.RawText
+                    }
+                }]
+        };
+    }
+
+    private getDataForHostedVSTS(result, path) {
+        return {
             comment: result.comment,
             changes: [
                 {
@@ -41,14 +74,7 @@ export class TFVCFolderManager extends FolderManager.FolderManager
                     }
                 }]
         };
-
-        (<any>tfvcClient).createChangeset(data).then(
-            () => {
-                this.refreshBrowserWindow();
-            });
-
     }
-
     public checkDuplicateFolder(folderName: string): IPromise<boolean> {
         var deferred = Q.defer<boolean>();
 

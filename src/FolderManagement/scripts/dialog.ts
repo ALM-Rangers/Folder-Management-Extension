@@ -13,6 +13,7 @@
 //--------------------------------------------------------------------- 
 import Main = require("scripts/main");
 import FolderManager = require("scripts/FolderManager")
+import Context = require("VSS/Context");
 
 export interface IFormInput {
     folderName: string;
@@ -108,7 +109,8 @@ export class AddFolderDialog {
     public setVersionControl(type: Main.SourceControl) {
         this.versionControlType = type;
 
-        if (type === Main.SourceControl.TFVC) {
+        if (type === Main.SourceControl.TFVC
+            && !Context.getPageContext().webAccessConfiguration.isHosted) { // added because TFS 2015.2 doesn't have the REST api yet for adding an empty folder. Remove in future version
             $(".git-file").html("<br/>");
         }
     }
