@@ -1,5 +1,7 @@
 # VSO Extension - Folder Management
 
+![](https://almrangers.visualstudio.com/DefaultCollection/_apis/public/build/definitions/7f3cfb9a-d1cb-4e66-9d36-1af87b906fe9/97/badge)
+
 ### What
 Easily and quickly create new folders in Code Explorer through the Web Access for TFVC and Git.
 
