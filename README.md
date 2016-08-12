@@ -32,7 +32,7 @@ Check out [Wouter de Kort's](http://blogs.msdn.com/b/willy-peter_schaub/archive/
 </table>
 
 ###Contribute
-Contributions to Print Cards are welcome. Here is how you can contribute to Print Cards:  
+Contributions to Folder Management are welcome. Here is how you can contribute to Folder Management:  
 
 - Submit bugs and help us verify fixes  
 - Submit pull requests for bug fixes and features and discuss existing proposals   
