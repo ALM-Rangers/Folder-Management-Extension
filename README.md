@@ -1,4 +1,4 @@
-# VSO Extension - Folder Management
+# Folder Management Extension
 
 ![](https://almrangers.visualstudio.com/DefaultCollection/_apis/public/build/definitions/7f3cfb9a-d1cb-4e66-9d36-1af87b906fe9/97/badge)
 
