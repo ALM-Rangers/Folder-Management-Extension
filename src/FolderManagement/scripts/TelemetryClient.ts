@@ -95,7 +95,7 @@ export class TelemetryClient {
     public trackMetric(name: string, average: number, sampleCount?: number, min?: number, max?: number, properties?: Object) {
         try {
             if (this.appInsightsClient != null) {
-                this.appInsightsClient.trackMetric("CountdownWidgetFolderManagement." + name, average, sampleCount, min, max, properties);
+                this.appInsightsClient.trackMetric("FolderManagement." + name, average, sampleCount, min, max, properties);
                 this.appInsightsClient.flush();
             }
         }
