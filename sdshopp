@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>sisaiya dalel khan
 
 <!-- For more information on using web.config transformation visit http://go.microsoft.com/fwlink/?LinkId=125889 -->
 
@@ -14,7 +14,7 @@
         xdt:Transform="SetAttributes" xdt:Locator="Match(name)"/>
     </connectionStrings>
   -->
-  <system.web>
+  <system.web> sdshopp
     <compilation xdt:Transform="RemoveAttributes(debug)" />
     <!--
       In the example below, the "Replace" transform will replace the entire 
