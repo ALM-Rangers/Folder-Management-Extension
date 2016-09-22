@@ -17,7 +17,7 @@ export class TelemetryClient {
         try {
             var snippet: any = {
                 config: {
-                    instrumentationKey: "34dcf687-abc9-413a-b8d2-54f85a8496ba"
+                    instrumentationKey: "__INSTRUMENTATIONKEY__"
                 }
             };
             var x = VSS.getExtensionContext();
