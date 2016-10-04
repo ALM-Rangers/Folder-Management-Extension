@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "publisher": "",
   "name": "Another Sample Extension",
-  "description": "Quickly create a folder in your Visual Studio Team Services source repositories from the web. No need to clone the repository locally or install extra tools.",
+  "description": "Create a folder in your source repositories from the web. No need to clone the repository or install extra tools.",
   "icons": {
     "default": "images/VSO-Folder-196x.png"
   },
