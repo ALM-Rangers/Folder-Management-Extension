@@ -20,10 +20,19 @@ You can create nested folders by using `/`. For example, `MyNewFolder/MyNestedFo
 
 ## Learn more ##
 
-The [source](https://github.com/ALM-Rangers/VSO-Extension-FolderManagement) to this extension is available. Feel free to take, fork, and extend.
+The [source](https://github.com/ALM-Rangers/Folder-Management-Extension) to this extension is available. Feel free to take, fork, and extend.
 
 > Microsoft DevLabs is an outlet for experiments from Microsoft, experiments that represent some of the latest ideas around developer tools. Solutions in this category are designed for broad usage, and you are encouraged to use and provide feedback on them; however, these extensions are not supported nor are any commitments made as to their longevity.
 
-##Contributors##
+## Contributors
 
 We thank the following contributor(s) for this extension: Abel Wang and Wouter de Kort. 
+
+## Feedback
+
+We need your feedback! Here are some ways to connect with us:
+
+- Add a review below.
+- Send us an [email](mailto://mktdevlabs@microsoft.com).
+
+Review the [list of features and resolved issues of latest tools and extensions](https://aka.ms/vsarreleases) for information on the latest releases.

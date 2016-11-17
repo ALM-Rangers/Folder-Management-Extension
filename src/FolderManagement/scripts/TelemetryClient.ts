@@ -17,7 +17,7 @@ export class TelemetryClient {
         try {
             var snippet: any = {
                 config: {
-                    instrumentationKey: "34dcf687-abc9-413a-b8d2-54f85a8496ba"
+                    instrumentationKey: "__INSTRUMENTATIONKEY__"
                 }
             };
             var x = VSS.getExtensionContext();
@@ -95,7 +95,7 @@ export class TelemetryClient {
     public trackMetric(name: string, average: number, sampleCount?: number, min?: number, max?: number, properties?: Object) {
         try {
             if (this.appInsightsClient != null) {
-                this.appInsightsClient.trackMetric("CountdownWidgetFolderManagement." + name, average, sampleCount, min, max, properties);
+                this.appInsightsClient.trackMetric("FolderManagement." + name, average, sampleCount, min, max, properties);
                 this.appInsightsClient.flush();
             }
         }
