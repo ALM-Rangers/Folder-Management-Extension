@@ -44,13 +44,17 @@
       "uri": "http://blogs.msdn.com/b/visualstudioalmrangers/archive/2015/07/02/folder-management-visual-studio-online-extension-by-wouter-de-kort.aspx"
     }
   },
+  "repository": {
+    "type": "git",
+    "uri": "https://github.com/ALM-Rangers/Folder-Management-Extension"
+  },
   "branding": {
     "color": "rgb(51,65,133)",
     "theme": "dark"
   },
   "scopes": [
     "vso.code_write",
-    "vso.code_manage" 
+    "vso.code_manage"
   ],
   "files": [
     {
@@ -79,10 +83,10 @@
     }
   ],
   "targets": [
-        {
-            "id": "Microsoft.VisualStudio.Services"
-        }
-    ],
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
   "contributions": [
     {
       "id": "addFolder",
