@@ -10,7 +10,7 @@ There are many ways to contribute: logging bugs, creating suggestions and submit
 
 
 # Did you write a patch that fixes a bug or adds a new feature?  
-- Open a new GitHub pull request with the patch/new feautre.
+- Open a new GitHub pull request with the patch/new feature.
   
 - Ensure the PR description clearly describes the problem and solution. Include the relevant issue number if applicable.
 
