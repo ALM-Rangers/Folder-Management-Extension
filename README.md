@@ -39,4 +39,4 @@ Contributions to Folder Management are welcome. Here is how you can contribute t
 - Submit bugs and help us verify fixes  
 - Submit pull requests for bug fixes and features and discuss existing proposals   
 
-Please refer to [Contribution guidelines](.github/CONTRIBUTING.md) and the [Code of Conduct](.github/COC.md) for more details.
+Please refer to [Contribution guidelines](.github/CONTRIBUTING.md) and the [Code of Conduct](.github/COC.md) for more details
