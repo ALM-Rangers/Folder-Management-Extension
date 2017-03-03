@@ -8,6 +8,7 @@
     <OutputType>Library</OutputType>
     <OutputPath>bin</OutputPath>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TypeScriptToolsVersion>1.8</TypeScriptToolsVersion>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
     <UseIISExpress>true</UseIISExpress>
