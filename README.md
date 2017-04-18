@@ -2,6 +2,8 @@
 
 ![](https://almrangers.visualstudio.com/DefaultCollection/_apis/public/build/definitions/7f3cfb9a-d1cb-4e66-9d36-1af87b906fe9/97/badge)
 
+> ![Gears](Gears.png) Interested how our CI/CD pipeline works? Read [Set up a CI/CD pipeline for your Team Services extension](https://blogs.msdn.microsoft.com/visualstudioalmrangers/2017/04/17/set-up-a-cicd-pipeline-for-your-team-services-extension/) to learn more. 
+
 ##What
 Easily and quickly create new folders in Code Explorer through the Web Access for TFVC and Git.
 
