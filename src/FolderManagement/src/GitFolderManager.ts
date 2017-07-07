@@ -1,121 +1,124 @@
-﻿//---------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------
 // <copyright file="GitFolderManager.ts">
 //    This code is licensed under the MIT License.
-//    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
-//    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
-//    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+//    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+//    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+//    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
 //    PARTICULAR PURPOSE AND NONINFRINGEMENT.
 // </copyright>
 // <summary>
 // TypeScript class that creates a Git folder after the user hits create.
 // </summary>
-
-//---------------------------------------------------------------------
+// ---------------------------------------------------------------------
 
 import VCContracts = require("TFS/VersionControl/Contracts");
 import RestClient = require("TFS/VersionControl/GitRestClient");
 import Dialog = require("./Dialog");
-//import TelemetryClient = require("./TelemetryClient");
+// import TelemetryClient = require("./TelemetryClient");
 import FolderManager = require("./FolderManager");
 import Q = require("q");
 
 export class GitFolderManager extends FolderManager.FolderManager implements FolderManager.IFolderManager {
 
-    constructor(actionContext) {
-        super(actionContext);
-    }
+	constructor(actionContext) {
+		super(actionContext);
+	}
 
-    private getCommitData(branchName: string, oldCommitId: string, basePath: string, folderName: string, placeHolderFileName: string, comment: string) {
-        return {
-            refUpdates: [
-                {
-                    name: "refs/heads/" + branchName,
-                    oldObjectId: oldCommitId
-                }
-            ],
-            commits: [
-                {
-                    comment: comment,
-                    changes: [
-                        {
-                            changeType: "add",
-                            item: {
-                                path: basePath + "/" + folderName + "/" + placeHolderFileName
-                            },
-                            newContent: {
-                                content: "Git placeholder file",
-                                contentType: "rawtext"
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
+	public checkDuplicateFolder(folderName: string): IPromise<boolean> {
 
-    public checkDuplicateFolder(folderName: string): IPromise<boolean> {
+		const deferred = Q.defer<boolean>();
+		const actionContext = this.actionContext;
 
-        var deferred = Q.defer<boolean>();
-        var actionContext = this.actionContext;
+		const repositoryId = actionContext.gitRepository.id;
+		const branchName = actionContext.version;
+		let basePath = this.actionContext.item.path;
 
-        var repositoryId = actionContext.gitRepository.id;
-        var branchName = actionContext.version;
-        var basePath = this.actionContext.item.path;
+		const gitClient = RestClient.getClient();
 
-        var gitClient = RestClient.getClient();
+		const versionDescriptor: VCContracts.GitVersionDescriptor = {
+			version: branchName,
+			versionOptions: VCContracts.GitVersionOptions.None,
+			versionType: VCContracts.GitVersionType.Branch,
+		};
 
-        var versionDescriptor: VCContracts.GitVersionDescriptor =
-            {
-                version: branchName,
-                versionOptions: VCContracts.GitVersionOptions.None,
-                versionType: VCContracts.GitVersionType.Branch
-            };
+		gitClient.getItems(repositoryId, null, null, VCContracts.VersionControlRecursionType.Full,
+			true, false, false, false, versionDescriptor)
+			.then((result) => {
+				if (basePath === "/") {
+					basePath = "";
+				}
+				const folderPath = basePath + "/" + folderName;
+				for (const current of result) {
+					if (current.isFolder
+						&& current.path.length <= folderPath.length
+						&& current.path.indexOf(folderPath) === 0) {
+						deferred.resolve(true);
+						return;
+					}
+				}
 
-        gitClient.getItems(repositoryId, null, null, VCContracts.VersionControlRecursionType.Full, true, false, false, false, versionDescriptor)
-            .then((result) => {
-                if (basePath == "/") basePath = "";
-                var folderPath = basePath + "/" + folderName;
-                for (var i = 0; i < result.length; i++) {
-                    var current = result[i];
-                    if (current.isFolder
-                        && current.path.length <= folderPath.length
-                        && current.path.indexOf(folderPath) === 0) {
-                        deferred.resolve(true);
-                        return;
-                    }
-                }
+				deferred.resolve(false);
 
-                deferred.resolve(false);
+			});
+		return deferred.promise;
+	}
 
-            });
-        return deferred.promise;
-    }
+	public dialogCallback: (result: Dialog.IFormInput) => void = (result) => {
+		const actionContext = this.actionContext;
 
-    public dialogCallback: (result: Dialog.IFormInput) => void = (result) => {
-        var actionContext = this.actionContext;
+		const folderName = result.folderName;
+		const placeHolderFileName = result.placeHolderFileName;
+		const repositoryId = actionContext.gitRepository.id;
+		const branchName = actionContext.version;
+		const basePath = this.actionContext.item ? this.actionContext.item.path : "";
+		const comment = result.comment;
 
-        var folderName = result.folderName;
-        var placeHolderFileName = result.placeHolderFileName;
-        var repositoryId = actionContext.gitRepository.id;
-        var branchName = actionContext.version;
-        var basePath = this.actionContext.item ? this.actionContext.item.path : "";
-        var comment = result.comment;
+		const gitClient = RestClient.getClient();
 
-        var gitClient = RestClient.getClient();
+		const criteria = { $top: 1 } as VCContracts.GitQueryCommitsCriteria;
 
-        var criteria = <VCContracts.GitQueryCommitsCriteria>{ $top: 1, };
+		gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(
+			(refs) => {
+				const oldCommitId = refs[0].objectId;
 
-        gitClient.getRefs(repositoryId, undefined, "heads/" + branchName).then(
-            (refs) => {
-                var oldCommitId = refs[0].objectId;
+				const data = this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
 
-                var data = this.getCommitData(branchName, oldCommitId, basePath, folderName, placeHolderFileName, comment);
+				(gitClient as any).createPush(data, repositoryId, undefined).then(
+					() => {
+						// TelemetryClient.TelemetryClient.getClient().trackEvent("Git_Folder_Added");
+						this.refreshBrowserWindow();
+					});
+			});
+	}
 
-                (<any>gitClient).createPush(data, repositoryId, undefined).then(
-                    () => {
-                        //TelemetryClient.TelemetryClient.getClient().trackEvent("Git_Folder_Added");
-                        this.refreshBrowserWindow();
-                    });
-            });
-    };
+	private getCommitData(
+		branchName: string, oldCommitId: string, basePath: string,
+		folderName: string, placeHolderFileName: string, comment: string) {
+
+		return {
+			commits: [
+				{
+					changes: [
+						{
+							changeType: "add",
+							item: {
+								path: basePath + "/" + folderName + "/" + placeHolderFileName,
+							},
+							newContent: {
+								content: "Git placeholder file",
+								contentType: "rawtext",
+							},
+						},
+					],
+					comment,
+				},
+			],
+			refUpdates: [
+				{
+					name: "refs/heads/" + branchName,
+					oldObjectId: oldCommitId,
+				},
+			],
+		};
+	}
 }

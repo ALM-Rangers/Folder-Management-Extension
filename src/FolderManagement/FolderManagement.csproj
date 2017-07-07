@@ -45,12 +45,12 @@
     <TypeScriptCompile Include="src\FolderManager.ts" />
     <TypeScriptCompile Include="src\GitFolderManager.ts" />
     <TypeScriptCompile Include="src\main.ts" />
+    <TypeScriptCompile Include="src\telemetryClientSettings.ts" />
     <TypeScriptCompile Include="src\TFVCFolderManager.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="vss-extension.json" />
     <Content Include="package.json" />
-    <Content Include="typings.json" />
     <Content Include="mp_terms.md" />
     <Content Include="tsconfig.json" />
     <Content Include="tslint.json" />

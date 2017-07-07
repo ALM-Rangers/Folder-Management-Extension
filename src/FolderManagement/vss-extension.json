@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "AnotherSampleExtension",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "baseUri": "https://localhost:44300/",
   "publisher": "WouterDeKortPlayground",
   "name": "Another Sample Extension",
