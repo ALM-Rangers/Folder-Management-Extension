@@ -1,4 +1,3 @@
-/// <reference path="../typings/index.d.ts" />
 //---------------------------------------------------------------------
 // <copyright file="main.ts">
 //    This code is licensed under the MIT License.
@@ -11,16 +10,16 @@
 // TypeScript class that adds the menu action and shows the dialog.
 // </summary>
 //---------------------------------------------------------------------
-import GitFolderManager = require("scripts/GitFolderManager");
-import TFVCFolderManager = require("scripts/TFVCFolderManager");
-import Dialog = require("scripts/dialog");
-import TelemetryClient = require("scripts/TelemetryClient");
+import GitFolderManager = require("./GitFolderManager");
+import TFVCFolderManager = require("./TFVCFolderManager");
+import Dialog = require("./dialog");
+//import TelemetryClient = require("./TelemetryClient");
 
 export enum SourceControl { Git, TFVC };
 
 export class AddFolderMenu {
     private actionContext;
-    public TelemetryClient = TelemetryClient.TelemetryClient.getClient();
+//    public TelemetryClient = TelemetryClient.TelemetryClient.getClient();
 
     public execute(actionContext) {
         actionContext.getSourceItemContext().then((sourceContext) => {
@@ -50,12 +49,12 @@ export class AddFolderMenu {
             if (sourceControlType == SourceControl.Git) {
                 folderManager = new GitFolderManager.GitFolderManager(this.actionContext);
                 callBack = folderManager.dialogCallback;
-                this.TelemetryClient.trackEvent("Git_Dialog_Opened");
+//                this.TelemetryClient.trackEvent("Git_Dialog_Opened");
             }
             else {
                 folderManager = new TFVCFolderManager.TFVCFolderManager(this.actionContext);
                 callBack = folderManager.dialogCallback;
-                this.TelemetryClient.trackEvent("TFVC_Dialog_Opened");
+//                this.TelemetryClient.trackEvent("TFVC_Dialog_Opened");
             }
 
             var dialogOptions = {

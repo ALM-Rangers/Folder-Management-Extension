@@ -16,8 +16,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Folder Management</title>
-    <script src="scripts/lib/VSS.SDK.js"></script>
-    <script src="scripts/lib/ai.0.21.5-build00175.min.js"></script>
+    <script src="lib/VSS.SDK.js"></script>
+    <script src="lib/ai.0.js"></script>
 </head>
 <body>
     <div>Users will never see this page.</div>
@@ -30,7 +30,7 @@
             usePlatformStyles: true
         });
         VSS.ready(function () {
-            require(["scripts/main"], function (main) { });
+            require(["dist/main"], function (main) { });
         });
     </script>
 </body>

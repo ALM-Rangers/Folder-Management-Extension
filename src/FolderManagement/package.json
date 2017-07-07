@@ -7,28 +7,29 @@
     "tfs"
   ],
   "scripts": {
-    "initdev": "typings install",
-    "copyfiles": "copyfiles -f node_modules/vss-web-extension-sdk/lib/VSS.SDK.js node_modules/jquery/dist/jquery.min.js scripts/lib",
-    "setup": "npm run initdev && npm run copyfiles",
-    "package": "tfx extension create --manifest-globs vss-extension.json",
-    "publish": "tfx extension publish --token <token> --manifest-globs vss-extension.json"
+    "build": "npm run lint && npm run clean && npm run webpack",
+    "webpack": "webpack --progress --colors --config webpack.config.js --output-path ./dist -p",
+    "postbuild": "npm run package",
+    "package": "tfx extension create  --rev-version",
+    "gallery-publish": "tfx extension publish --rev-version --token 5xm472ndfkubw7wupeubzjieava7kmlxnvxphm6rkdtv4eyoi55q",
+    "clean": "rimraf ./dist && rimraf ./*.vsix",
+    "lint": "tslint -c tslint.json 'src/*.ts'"
   },
   "author": "ALM Rangers",
   "license": "MIT",
   "devDependencies": {
-    "copyfiles": "^1.0.0",
-    "grunt": "^1.0.1",
-    "grunt-cli": "^1.2.0",
-    "grunt-contrib-copy": "^1.0.0",
-    "grunt-exec": "^1.0.0",
-    "grunt-typescript": "^0.8.0",
-    "jquery": "^3.1.0",
-    "requirejs": "^2.2.0",
-    "tfx-cli": "^0.3.22",
-    "tsconfig-glob": "^0.4.3",
-    "typescript": "1.8.10",
-    "typings": "^1.3.1",
-    "vset": "^0.4.24",
-    "vss-web-extension-sdk": "^1.101.0"
+    "rimraf": "^2.6.1",
+    "tfx-cli": "^0.4.9",
+    "tslint": "^5.5.0",
+    "typescript": "^2.4.1",
+    "webpack": "^3.1.0",
+    "tslint-loader": "^3.5.3"
+  },
+  "dependencies": {
+    "@types/jquery": "^2.0.34",
+    "@types/q": "0.0.32",
+    "vss-web-extension-sdk": "^2.117.0",
+    "applicationinsights-js": "^1.0.9",
+    "telemetryclient-team-services-extension": "*"
   }
 }

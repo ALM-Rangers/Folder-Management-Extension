@@ -8,7 +8,7 @@
     <OutputType>Library</OutputType>
     <OutputPath>bin</OutputPath>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <TypeScriptToolsVersion>1.8</TypeScriptToolsVersion>
+    <TypeScriptToolsVersion>2.2</TypeScriptToolsVersion>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
     <UseIISExpress>true</UseIISExpress>
@@ -22,36 +22,38 @@
     <Service Include="{4A0DDDB5-7A95-4FBF-97CC-616D07737A77}" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="css\dialog.css" />
-    <Content Include="dialog.html" />
-    <Content Include="images\image1.png" />
-    <Content Include="images\show-properties.png" />
-    <Content Include="images\VSO-Folder-16x.png" />
-    <Content Include="images\VSO-Folder-196x.png" />
-    <Content Include="images\VSO-Folder-wide.png" />
-    <Content Include="main.html" />
+    <Content Include="static\css\dialog.css" />
+    <Content Include="static\dialog.html" />
+    <Content Include="static\images\image1.png" />
+    <Content Include="static\images\show-properties.png" />
+    <Content Include="static\images\VSO-Folder-16x.png" />
+    <Content Include="static\images\VSO-Folder-196x.png" />
+    <Content Include="static\images\VSO-Folder-wide.png" />
+    <Content Include="static\lib\ai.0.js" />
+    <Content Include="static\lib\ai.js" />
+    <Content Include="static\lib\VSS.SDK.js" />
+    <Content Include="static\lib\VSS.SDK.min.js" />
+    <Content Include="static\main.html" />
     <Content Include="license.txt" />
-    <Content Include="screenshots\Screen1.png" />
-    <Content Include="screenshots\Screen2.png" />
-    <Content Include="scripts\lib\ai.0.21.5-build00175.min.js" />
-    <Content Include="sdk\scripts\VSS.SDK.js" />
+    <Content Include="static\screenshots\Screen1.png" />
+    <Content Include="static\screenshots\Screen2.png" />
     <Content Include="web.config" />
+    <Content Include="webpack.config.js" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="scripts\dialog.ts" />
-    <TypeScriptCompile Include="scripts\FolderManager.ts" />
-    <TypeScriptCompile Include="scripts\GitFolderManager.ts" />
-    <TypeScriptCompile Include="scripts\lib\ai.0.21.5-build00175.d.ts" />
-    <TypeScriptCompile Include="scripts\main.ts" />
-    <TypeScriptCompile Include="scripts\TelemetryClient.ts" />
-    <TypeScriptCompile Include="scripts\TFVCFolderManager.ts" />
+    <TypeScriptCompile Include="src\dialog.ts" />
+    <TypeScriptCompile Include="src\FolderManager.ts" />
+    <TypeScriptCompile Include="src\GitFolderManager.ts" />
+    <TypeScriptCompile Include="src\main.ts" />
+    <TypeScriptCompile Include="src\TFVCFolderManager.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="vss-extension.json" />
-    <Content Include="vwd.webinfo" />
     <Content Include="package.json" />
     <Content Include="typings.json" />
-    <Content Include="marketplace\mp_terms.md" />
+    <Content Include="mp_terms.md" />
+    <Content Include="tsconfig.json" />
+    <Content Include="tslint.json" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>

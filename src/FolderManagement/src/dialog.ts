@@ -1,4 +1,3 @@
-/// <reference path="../typings/index.d.ts" />
 //---------------------------------------------------------------------
 // <copyright file="dialog.ts">
 //    This code is licensed under the MIT License.
@@ -11,8 +10,8 @@
 // TypeScript class for the dialog. Handles user input and returns this to the callback.
 // <summary>
 //--------------------------------------------------------------------- 
-import Main = require("scripts/main");
-import FolderManager = require("scripts/FolderManager")
+import Main = require("./main");
+import FolderManager = require("./FolderManager")
 import Context = require("VSS/Context");
 
 export interface IFormInput {
@@ -26,7 +25,7 @@ export class AddFolderDialog {
 
     constructor() {
         $("#folderName").on('input propertychange paste', (event: any) => {
-            if (window.event && event.type == "propertychange" && event.propertyName != "value")
+            if (window.event && event.type === "propertychange" && event.propertyName !== "value")
                 return;
 
             window.clearTimeout((<any>$(this).data("timeout")));
@@ -45,7 +44,7 @@ export class AddFolderDialog {
     private getFormInput(): IFormInput {
         return {
             folderName: $("#folderName").val(),
-            addPlaceHolderFile: this.versionControlType == Main.SourceControl.Git,
+            addPlaceHolderFile: this.versionControlType === Main.SourceControl.Git,
             placeHolderFileName: "_placeHolderFile.md",
             comment: $("#comment").val(),
         };

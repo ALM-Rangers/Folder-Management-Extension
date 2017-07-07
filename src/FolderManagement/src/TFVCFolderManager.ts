@@ -1,5 +1,4 @@
-﻿/// <reference path="../typings/index.d.ts" />
-//---------------------------------------------------------------------
+﻿//---------------------------------------------------------------------
 // <copyright file="TFVCFolderManager.ts">
 //    This code is licensed under the MIT License.
 //    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
@@ -12,9 +11,9 @@
 // </summary>
 //---------------------------------------------------------------------
 import Context = require("VSS/Context");
-import Dialog = require("scripts/Dialog");
-import FolderManager = require("scripts/FolderManager");
-import TelemetryClient = require("scripts/TelemetryClient");
+import Dialog = require("./Dialog");
+import FolderManager = require("./FolderManager");
+//import TelemetryClient = require("./TelemetryClient");
 import RestClient = require("TFS/VersionControl/TfvcRestClient");
 import VCContracts = require("TFS/VersionControl/Contracts");
 import Q = require("q");
@@ -22,7 +21,7 @@ import Q = require("q");
 export class TFVCFolderManager extends FolderManager.FolderManager
     implements FolderManager.IFolderManager {
 
-    constructor(actionContext) {
+    constructor(actionContext) {	
         super(actionContext);
     }
 
@@ -41,7 +40,7 @@ export class TFVCFolderManager extends FolderManager.FolderManager
 
         (<any>tfvcClient).createChangeset(data).then(
             () => {
-                TelemetryClient.TelemetryClient.getClient().trackEvent("TFVC_Folder_Added");
+                //TelemetryClient.TelemetryClient.getClient().trackEvent("TFVC_Folder_Added");
                 this.refreshBrowserWindow();
             });
     }

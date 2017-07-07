@@ -1,5 +1,4 @@
-﻿/// <reference path="../typings/index.d.ts" />
-//---------------------------------------------------------------------
+﻿//---------------------------------------------------------------------
 // <copyright file="GitFolderManager.ts">
 //    This code is licensed under the MIT License.
 //    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
@@ -15,9 +14,9 @@
 
 import VCContracts = require("TFS/VersionControl/Contracts");
 import RestClient = require("TFS/VersionControl/GitRestClient");
-import Dialog = require("scripts/Dialog");
-import TelemetryClient = require("scripts/TelemetryClient");
-import FolderManager = require("scripts/FolderManager");
+import Dialog = require("./Dialog");
+//import TelemetryClient = require("./TelemetryClient");
+import FolderManager = require("./FolderManager");
 import Q = require("q");
 
 export class GitFolderManager extends FolderManager.FolderManager implements FolderManager.IFolderManager {
@@ -114,7 +113,7 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
 
                 (<any>gitClient).createPush(data, repositoryId, undefined).then(
                     () => {
-                        TelemetryClient.TelemetryClient.getClient().trackEvent("Git_Folder_Added");
+                        //TelemetryClient.TelemetryClient.getClient().trackEvent("Git_Folder_Added");
                         this.refreshBrowserWindow();
                     });
             });

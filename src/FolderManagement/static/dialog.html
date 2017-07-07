@@ -15,7 +15,7 @@
 <html>
 <head>
     <title>Create new folder</title>
-    <script src="scripts/lib/jquery.min.js"></script>
+    <script src="lib/jquery.min.js"></script>
     <link href="css/dialog.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
@@ -35,7 +35,7 @@
     <textarea class="comment-input" id="comment">Added new folder</textarea>
     
     
-    <script src="sdk/scripts/VSS.SDK.js"></script>
+    <script src="lib/VSS.SDK.js"></script>
     <script type="text/javascript">
         VSS.init({
             explicitNotifyLoaded: true,
@@ -44,7 +44,7 @@
         });
 
          VSS.ready(function () {
-            require(["scripts/dialog"], function (dialog) { });
+            require(["dist/dialog"], function (dialog) { });
         });
     </script>
 </body>

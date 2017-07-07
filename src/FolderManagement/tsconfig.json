@@ -3,11 +3,15 @@
     "target": "es5",
     "module": "amd",
     "sourceMap": true,
-    "types": []
-  },  
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "types": [
+      "vss-web-extension-sdk"
+    ],
+    "outDir": "dist/"
+  },
   "exclude": [
-    "node_modules",
-    "typings/globals",
-    "typings/globals.dt.ts"
+    "node_modules"
   ]
 }

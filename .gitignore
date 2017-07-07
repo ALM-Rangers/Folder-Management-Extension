@@ -1,3 +1,4 @@
+.vs/
 src/.vs
 obj/
 bin/
@@ -8,3 +9,4 @@ typings/
 /src/FolderManagement/scripts/*.map
 
 *.vsix
+*.suo

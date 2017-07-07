@@ -1,6 +1,5 @@
-//----------------------------------------------------------
+//dependencies=
 // Copyright (C) Microsoft Corporation. All rights reserved.
-//----------------------------------------------------------
 ///<reference path='../References/VSS-Common.d.ts' />
 ///<reference path='../References/VSS.SDK.Interfaces.d.ts' />
 ///<reference path='../References/SDK.Interfaces.d.ts' />
@@ -110,6 +109,12 @@ var XDM;
             if (!this._isRejected && !this._isResolved) {
                 this._isRejected = true;
                 this._rejectValue = reason;
+                if (this._rejectCallbacks.length === 0 && window.console && window.console.warn) {
+                    console.warn("Rejected XDM promise with no reject callbacks");
+                    if (reason) {
+                        console.warn(reason);
+                    }
+                }
             }
             if (this._isRejected && this._rejectCallbacks.length > 0) {
                 var rejectCallbacks = this._rejectCallbacks.splice(0);
@@ -122,7 +127,7 @@ var XDM;
             }
         };
         return XdmDeferred;
-    })();
+    }());
     var smallestRandom = parseInt("10000000000", 36);
     var maxSafeInteger = Number.MAX_SAFE_INTEGER || 9007199254740991;
     /**
@@ -151,6 +156,14 @@ var XDM;
             this._registeredObjects[instanceId] = instance;
         };
         /**
+        * Unregister an object (instance or factory method) that was previously registered by this frame
+        *
+        * @param instanceId unique id of the registered object
+        */
+        XDMObjectRegistry.prototype.unregister = function (instanceId) {
+            delete this._registeredObjects[instanceId];
+        };
+        /**
         * Get an instance of an object registered with the given id
         *
         * @param instanceId unique id of the registered object
@@ -169,7 +182,7 @@ var XDM;
             }
         };
         return XDMObjectRegistry;
-    })();
+    }());
     XDM.XDMObjectRegistry = XDMObjectRegistry;
     ;
     /**
@@ -259,17 +272,15 @@ var XDM;
                     methodArgs = this._customDeserializeObject(rpcMessage.params);
                 }
                 var result = method.apply(registeredInstance, methodArgs);
-                if (result !== undefined) {
-                    if (result.then && typeof result.then === "function") {
-                        result.then(function (asyncResult) {
-                            _this._success(rpcMessage, asyncResult, rpcMessage.handshakeToken);
-                        }, function (e) {
-                            _this._error(rpcMessage, e, rpcMessage.handshakeToken);
-                        });
-                    }
-                    else {
-                        this._success(rpcMessage, result, rpcMessage.handshakeToken);
-                    }
+                if (result && result.then && typeof result.then === "function") {
+                    result.then(function (asyncResult) {
+                        _this._success(rpcMessage, asyncResult, rpcMessage.handshakeToken);
+                    }, function (e) {
+                        _this._error(rpcMessage, e, rpcMessage.handshakeToken);
+                    });
+                }
+                else {
+                    this._success(rpcMessage, result, rpcMessage.handshakeToken);
                 }
             }
             catch (exception) {
@@ -344,8 +355,15 @@ var XDM;
             /// Determines whether the current message belongs to this channel or not
             var rpcMessage = data;
             if (this._postToWindow === source) {
+                // For messages coming from sandboxed iframes the origin will be set to the string "null".  This is 
+                // how onprem works.  If it is not a sandboxed iFrame we will get the origin as expected.
                 if (this._targetOrigin) {
-                    return this._targetOrigin.toLowerCase().indexOf(origin.toLowerCase()) === 0;
+                    if (origin) {
+                        return origin.toLowerCase() === "null" || this._targetOrigin.toLowerCase().indexOf(origin.toLowerCase()) === 0;
+                    }
+                    else {
+                        return false;
+                    }
                 }
                 else {
                     if (rpcMessage.handshakeToken && rpcMessage.handshakeToken === this._handshakeToken) {
@@ -355,6 +373,10 @@ var XDM;
                 }
             }
             return false;
+        };
+        XDMChannel.prototype.error = function (data, errorObj) {
+            var rpcMessage = data;
+            this._error(rpcMessage, errorObj, rpcMessage.handshakeToken);
         };
         XDMChannel.prototype._error = function (messageObj, errorObj, handshakeToken) {
             // Post back a response as an error which look like this -
@@ -380,7 +402,7 @@ var XDM;
         };
         XDMChannel.prototype._sendRpcMessage = function (message) {
             var messageString = JSON.stringify(message);
-            this._postToWindow.postMessage(messageString, this._targetOrigin || "*");
+            this._postToWindow.postMessage(messageString, "*");
         };
         XDMChannel.prototype._shouldSkipSerialization = function (obj) {
             for (var i = 0, l = XDMChannel.WINDOW_TYPES_TO_SKIP_SERIALIZATION.length; i < l; i++) {
@@ -416,6 +438,7 @@ var XDM;
                     item = parentObject[key];
                 }
                 catch (ex) {
+                    // Cannot access this property. Skip its serialization.
                 }
                 var itemType = typeof item;
                 if (itemType === "undefined") {
@@ -495,6 +518,7 @@ var XDM;
                     }
                 }
                 catch (ex) {
+                    // We may not be able to access the iterator of this object. Skip its serialization.
                 }
                 for (var key in keys) {
                     // Don't serialize properties that start with an underscore.
@@ -559,18 +583,18 @@ var XDM;
             }
             return obj;
         };
-        XDMChannel._nextChannelId = 1;
-        XDMChannel.MAX_XDM_DEPTH = 100;
-        XDMChannel.WINDOW_TYPES_TO_SKIP_SERIALIZATION = [
-            "Node",
-            "Window",
-            "Event"
-        ];
-        XDMChannel.JQUERY_TYPES_TO_SKIP_SERIALIZATION = [
-            "jQuery"
-        ];
         return XDMChannel;
-    })();
+    }());
+    XDMChannel._nextChannelId = 1;
+    XDMChannel.MAX_XDM_DEPTH = 100;
+    XDMChannel.WINDOW_TYPES_TO_SKIP_SERIALIZATION = [
+        "Node",
+        "Window",
+        "Event"
+    ];
+    XDMChannel.JQUERY_TYPES_TO_SKIP_SERIALIZATION = [
+        "jQuery"
+    ];
     XDM.XDMChannel = XDMChannel;
     /**
     * Registry of XDM channels kept per target frame/window
@@ -597,21 +621,42 @@ var XDM;
             this._channels.push(channel);
             return channel;
         };
+        XDMChannelManager.prototype.removeChannel = function (channel) {
+            this._channels = this._channels.filter(function (c) { return c !== channel; });
+        };
         XDMChannelManager.prototype._handleMessageReceived = function (event) {
             // get channel and dispatch to it
             var i, len, channel;
-            var rpcMessage = JSON.parse(event.data);
-            var handled = false, channelOwnerFound = false;
-            for (i = 0, len = this._channels.length; i < len; i++) {
-                channel = this._channels[i];
-                if (channel.owns(event.source, event.origin, rpcMessage)) {
-                    // event belongs to this channel. Dispatch the message
-                    channelOwnerFound = true;
-                    handled = channel.onMessage(rpcMessage, event.origin) || handled;
+            var rpcMessage;
+            if (typeof event.data === "string") {
+                try {
+                    rpcMessage = JSON.parse(event.data);
+                }
+                catch (error) {
+                    // The message is not a valid JSON string. Not one of our events.
                 }
             }
-            if (channelOwnerFound && !handled) {
-                console.error("No handler found on any channel for message: " + JSON.stringify(rpcMessage));
+            if (rpcMessage) {
+                var handled = false;
+                var channelOwner;
+                for (i = 0, len = this._channels.length; i < len; i++) {
+                    channel = this._channels[i];
+                    if (channel.owns(event.source, event.origin, rpcMessage)) {
+                        // keep a reference to the channel owner found. 
+                        channelOwner = channel;
+                        handled = channel.onMessage(rpcMessage, event.origin) || handled;
+                    }
+                }
+                if (!!channelOwner && !handled) {
+                    if (window.console) {
+                        console.error("No handler found on any channel for message: " + JSON.stringify(rpcMessage));
+                    }
+                    // for instance based proxies, send an error on the channel owning the message to resolve any control creation promises
+                    // on the host frame. 
+                    if (rpcMessage.instanceId) {
+                        channelOwner.error(rpcMessage, "The registered object " + rpcMessage.instanceId + " could not be found.");
+                    }
+                }
             }
         };
         XDMChannelManager.prototype._subscribe = function (windowObj) {
@@ -629,14 +674,15 @@ var XDM;
             }
         };
         return XDMChannelManager;
-    })();
+    }());
     XDM.XDMChannelManager = XDMChannelManager;
 })(XDM || (XDM = {}));
 var VSS;
 (function (VSS) {
-    VSS.VssSDKVersion = 0.1;
-    VSS.VssSDKRestVersion = "2.1";
-    var htmlElement;
+    // W A R N I N G: if VssSDKVersion changes, the VSS WEB SDK demand resolver needs to be updated with the new version
+    VSS.VssSDKVersion = 2.0;
+    VSS.VssSDKRestVersion = "3.1";
+    var bodyElement;
     var webContext;
     var hostPageContext;
     var extensionContext;
@@ -649,6 +695,131 @@ var VSS;
     var isReady = false;
     var readyCallbacks;
     var parentChannel = XDM.XDMChannelManager.get().addChannel(window.parent);
+    var shimmedLocalStorage;
+    var hostReadyForShimUpdates = false;
+    var Storage = (function () {
+        var changeCallback;
+        function invokeChangeCallback() {
+            if (changeCallback) {
+                changeCallback.call(this);
+            }
+        }
+        function Storage(changeCallback) {
+        }
+        Object.defineProperties(Storage.prototype, {
+            getItem: {
+                get: function () {
+                    return function (key) {
+                        var item = this["" + key];
+                        return typeof item === "undefined" ? null : item;
+                    };
+                }
+            },
+            setItem: {
+                get: function () {
+                    return function (key, value) {
+                        key = "" + key;
+                        var existingValue = this[key];
+                        var newValue = "" + value;
+                        if (existingValue !== newValue) {
+                            this[key] = newValue;
+                            invokeChangeCallback();
+                        }
+                    };
+                }
+            },
+            removeItem: {
+                get: function () {
+                    return function (key) {
+                        key = "" + key;
+                        if (typeof this[key] !== "undefined") {
+                            delete this[key];
+                            invokeChangeCallback();
+                        }
+                    };
+                }
+            },
+            clear: {
+                get: function () {
+                    return function () {
+                        var keys = Object.keys(this);
+                        if (keys.length > 0) {
+                            for (var _i = 0, keys_1 = keys; _i < keys_1.length; _i++) {
+                                var key = keys_1[_i];
+                                delete this[key];
+                            }
+                            invokeChangeCallback();
+                        }
+                    };
+                }
+            },
+            key: {
+                get: function () {
+                    return function (index) {
+                        return Object.keys(this)[index];
+                    };
+                }
+            },
+            length: {
+                get: function () {
+                    return Object.keys(this).length;
+                }
+            }
+        });
+        return Storage;
+    }());
+    function shimSandboxedProperties() {
+        var updateSettingsTimeout;
+        function updateShimmedStorageCallback() {
+            // Talk to the host frame on a 50 ms delay in order to batch storage/cookie updates
+            if (!updateSettingsTimeout) {
+                updateSettingsTimeout = setTimeout(function () {
+                    updateSettingsTimeout = 0;
+                    updateHostSandboxedStorage();
+                }, 50);
+            }
+        }
+        // Override document.cookie if it is not available
+        var hasCookieSupport = false;
+        try {
+            hasCookieSupport = typeof document.cookie === "string";
+        }
+        catch (ex) {
+        }
+        if (!hasCookieSupport) {
+            Object.defineProperty(Document.prototype, "cookie", {
+                get: function () {
+                    return "";
+                },
+                set: function (value) {
+                }
+            });
+        }
+        // Override browser storage
+        var hasLocalStorage = false;
+        try {
+            hasLocalStorage = !!window.localStorage;
+        }
+        catch (ex) {
+        }
+        if (!hasLocalStorage) {
+            delete window.localStorage;
+            shimmedLocalStorage = new Storage(updateShimmedStorageCallback);
+            Object.defineProperty(window, "localStorage", { value: shimmedLocalStorage });
+            delete window.sessionStorage;
+            Object.defineProperty(window, "sessionStorage", { value: new Storage() });
+        }
+    }
+    if (!window["__vssNoSandboxShim"]) {
+        try {
+            shimSandboxedProperties();
+        }
+        catch (ex) {
+            if (window.console && window.console.warn) {
+                window.console.warn("Failed to shim support for sandboxed properties: " + ex.message + ". Set \"window.__vssNoSandboxShim = true\" in order to bypass the shim of sandboxed properties.");
+            }
+        }
+    }
     /**
     * Service Ids for core services (to be used in VSS.getService)
     */
@@ -683,7 +854,8 @@ var VSS;
         window.setTimeout(function () {
             var appHandshakeData = {
                 notifyLoadSucceeded: !initOptions.explicitNotifyLoaded,
-                extensionReusedCallback: initOptions.extensionReusedCallback
+                extensionReusedCallback: initOptions.extensionReusedCallback,
+                vssSDKVersion: VSS.VssSDKVersion
             };
             parentChannel.invokeRemoteMethod("initialHandshake", "VSS.HostControl", [appHandshakeData]).then(function (handshakeData) {
                 hostPageContext = handshakeData.pageContext;
@@ -691,6 +863,37 @@ var VSS;
                 initialConfiguration = handshakeData.initialConfig || {};
                 initialContribution = handshakeData.contribution;
                 extensionContext = handshakeData.extensionContext;
+                if (handshakeData.sandboxedStorage) {
+                    var updateNeeded = false;
+                    if (shimmedLocalStorage) {
+                        if (handshakeData.sandboxedStorage.localStorage) {
+                            // Merge host data in with any values already set.
+                            var newData = handshakeData.sandboxedStorage.localStorage;
+                            // Check for any properties written prior to the initial handshake
+                            for (var _i = 0, _a = Object.keys(shimmedLocalStorage); _i < _a.length; _i++) {
+                                var key = _a[_i];
+                                var value = shimmedLocalStorage.getItem(key);
+                                if (value !== newData[key]) {
+                                    newData[key] = value;
+                                    updateNeeded = true;
+                                }
+                            }
+                            // Update the stored values
+                            for (var _b = 0, _c = Object.keys(newData); _b < _c.length; _b++) {
+                                var key = _c[_b];
+                                shimmedLocalStorage.setItem(key, newData[key]);
+                            }
+                        }
+                        else if (shimmedLocalStorage.length > 0) {
+                            updateNeeded = true;
+                        }
+                    }
+                    hostReadyForShimUpdates = true;
+                    if (updateNeeded) {
+                        // Talk to host frame to issue update
+                        updateHostSandboxedStorage();
+                    }
+                }
                 if (usingPlatformScripts || usingPlatformStyles) {
                     setupAmdLoader();
                 }
@@ -701,6 +904,12 @@ var VSS;
         }, 0);
     }
     VSS.init = init;
+    function updateHostSandboxedStorage() {
+        var storage = {
+            localStorage: JSON.stringify(shimmedLocalStorage || {})
+        };
+        parentChannel.invokeRemoteMethod("updateSandboxedStorage", "VSS.HostControl", [storage]);
+    }
     /**
      * Ensures that the AMD loader from the host is configured and fetches a script (AMD) module
      * (and its dependencies). If no callback is supplied, this will still perform an asynchronous
@@ -708,7 +917,7 @@ var VSS;
      *
      * Usage:
      *
-     * VSS.require(["VSS/Controls", "VSS/Controls/Grids", function(Controls, Grids) {
+     * VSS.require(["VSS/Controls", "VSS/Controls/Grids"], function(Controls, Grids) {
      *    ...
      * });
      *
@@ -729,11 +938,11 @@ var VSS;
         }
         if (loaderConfigured) {
             // Loader already configured, just issue require
-            window.require(modulesArray, callback);
+            issueVssRequire(modulesArray, callback);
         }
         else {
             if (!initOptions) {
-                init({ setupModuleLoader: true });
+                init({ usePlatformScripts: true });
             }
             else if (!usingPlatformScripts) {
                 usingPlatformScripts = true;
@@ -745,11 +954,23 @@ var VSS;
                 }
             }
             ready(function () {
-                window.require(modulesArray, callback);
+                issueVssRequire(modulesArray, callback);
             });
         }
     }
     VSS.require = require;
+    function issueVssRequire(modules, callback) {
+        if (hostPageContext.diagnostics.bundlingEnabled) {
+            window.require(["VSS/Bundling"], function (VSS_Bundling) {
+                VSS_Bundling.requireModules(modules).spread(function () {
+                    callback.apply(this, arguments);
+                });
+            });
+        }
+        else {
+            window.require(modules, callback);
+        }
+    }
     /**
     * Register a callback that gets called once the initial setup/handshake has completed.
     * If the initial setup is already completed, the callback is invoked at the end of the current call stack.
@@ -815,16 +1036,16 @@ var VSS;
     * @param context Optional context information to use when obtaining the service instance
     */
     function getService(contributionId, context) {
-        if (!context) {
-            context = {};
-        }
-        if (!context["webContext"]) {
-            context["webContext"] = getWebContext();
-        }
-        if (!context["extensionContext"]) {
-            context["extensionContext"] = getExtensionContext();
-        }
         return getServiceContribution(contributionId).then(function (serviceContribution) {
+            if (!context) {
+                context = {};
+            }
+            if (!context["webContext"]) {
+                context["webContext"] = getWebContext();
+            }
+            if (!context["extensionContext"]) {
+                context["extensionContext"] = getExtensionContext();
+            }
             return serviceContribution.getInstance(serviceContribution.id, context);
         });
     }
@@ -896,6 +1117,15 @@ var VSS;
     }
     VSS.register = register;
     /**
+    * Removes an object that this extension exposed to the host frame.
+    *
+    * @param instanceId unique id of the registered object
+    */
+    function unregister(instanceId) {
+        parentChannel.getObjectRegistry().unregister(instanceId);
+    }
+    VSS.unregister = unregister;
+    /**
     * Get an instance of an object registered with the given id
     *
     * @param instanceId unique id of the registered object
@@ -906,7 +1136,7 @@ var VSS;
     }
     VSS.getRegisteredObject = getRegisteredObject;
     /**
-    * Fetch an access token which will allow calls to be made to other VSO services
+    * Fetch an access token which will allow calls to be made to other VSTS services
     */
     function getAccessToken() {
         return parentChannel.invokeRemoteMethod("getAccessToken", "VSS.HostControl");
@@ -921,12 +1151,17 @@ var VSS;
     VSS.getAppToken = getAppToken;
     /**
     * Requests the parent window to resize the container for this extension based on the current extension size.
+    *
+    * @param width Optional width, defaults to scrollWidth
+    * @param height Optional height, defaults to scrollHeight
     */
-    function resize() {
-        if (!htmlElement) {
-            htmlElement = document.getElementsByTagName("html").item(0);
+    function resize(width, height) {
+        if (!bodyElement) {
+            bodyElement = document.getElementsByTagName("body").item(0);
         }
-        parentChannel.invokeRemoteMethod("resize", "VSS.HostControl", [htmlElement.scrollWidth, htmlElement.scrollHeight]);
+        var newWidth = typeof width === "number" ? width : bodyElement.scrollWidth;
+        var newHeight = typeof height === "number" ? height : bodyElement.scrollHeight;
+        parentChannel.invokeRemoteMethod("resize", "VSS.HostControl", [newWidth, newHeight]);
     }
     VSS.resize = resize;
     function setupAmdLoader() {
@@ -955,6 +1190,7 @@ var VSS;
             return;
         }
         var scripts = [];
+        var anyCoreScriptLoaded = false;
         // Add scripts and loader configuration
         if (hostPageContext.coreReferences.scripts) {
             hostPageContext.coreReferences.scripts.forEach(function (script) {
@@ -967,14 +1203,25 @@ var VSS;
                     else if (script.identifier === "JQueryUI") {
                         alreadyLoaded = !!(global.jQuery && global.jQuery.ui && global.jQuery.ui.version);
                     }
-                    else if (script.identifier === "MicrosoftAjax") {
-                        alreadyLoaded = !!(global.Sys && global.Sys.Browser);
+                    else if (script.identifier === "AMDLoader") {
+                        alreadyLoaded = typeof global.define === "function" && !!global.define.amd;
                     }
                     if (!alreadyLoaded) {
                         scripts.push({ source: getAbsoluteUrl(script.url, hostRootUri) });
                     }
+                    else {
+                        anyCoreScriptLoaded = true;
+                    }
                 }
             });
+            if (hostPageContext.coreReferences.coreScriptsBundle && !anyCoreScriptLoaded) {
+                // If core scripts bundle exists and no core scripts already loaded by extension,
+                // we are free to add core bundle. otherwise, load core scripts individually.
+                scripts = [{ source: getAbsoluteUrl(hostPageContext.coreReferences.coreScriptsBundle.url, hostRootUri) }];
+            }
+            if (hostPageContext.coreReferences.extensionCoreReferences) {
+                scripts.push({ source: getAbsoluteUrl(hostPageContext.coreReferences.extensionCoreReferences.url, hostRootUri) });
+            }
         }
         // Define a new config for extension loader
         var newConfig = {
@@ -1001,9 +1248,15 @@ var VSS;
             var contributionPaths = hostPageContext.moduleLoaderConfig.contributionPaths;
             if (contributionPaths) {
                 for (var p in contributionPaths) {
-                    if (contributionPaths.hasOwnProperty(p)) {
+                    if (contributionPaths.hasOwnProperty(p) && !newConfig.paths[p]) {
                         // Add the contribution path
-                        newConfig.paths[p] = hostRootUri + contributionPaths[p].value;
+                        var contributionPathValue = contributionPaths[p].value;
+                        if (!contributionPathValue.match("^https?://")) {
+                            newConfig.paths[p] = hostRootUri + contributionPathValue;
+                        }
+                        else {
+                            newConfig.paths[p] = contributionPathValue;
+                        }
                         // Look for other path mappings that fall under the contribution path (e.g. "bundles")
                         var configPaths = hostPageContext.moduleLoaderConfig.paths;
                         if (configPaths) {

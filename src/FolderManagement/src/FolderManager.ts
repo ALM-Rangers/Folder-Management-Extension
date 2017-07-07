@@ -1,5 +1,4 @@
-﻿/// <reference path="../typings/index.d.ts" />
-//---------------------------------------------------------------------
+﻿//---------------------------------------------------------------------
 // <copyright file="FolderManager.ts">
 //    This code is licensed under the MIT License.
 //    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF 
@@ -12,7 +11,7 @@
 // </summary>
 //---------------------------------------------------------------------
 import Q = require("q");
-import TelemetryClient = require("scripts/TelemetryClient");
+//import TelemetryClient = require("./TelemetryClient");
 
 export interface IFolderManager {
     dialogCallback; 
@@ -34,12 +33,12 @@ export class FolderManager {
     }
 
     protected showDuplicateFolderError(folderName: string) {
-        TelemetryClient.TelemetryClient.getClient().trackEvent("Duplicate_Folder_Name_Entered");    
+     //   TelemetryClient.TelemetryClient.getClient().trackEvent("Duplicate_Folder_Name_Entered");    
         $(".error-container").text("The folder " + folderName + " already exists");
     }
 
     protected hideDuplicateFolderError() {
-        TelemetryClient.TelemetryClient.getClient().trackEvent("Duplicate_Folder_Name_Resolved");
+       // TelemetryClient.TelemetryClient.getClient().trackEvent("Duplicate_Folder_Name_Resolved");
         $(".error-container").text("");
     }
 }

@@ -1,12 +1,13 @@
 {
   "manifestVersion": 1,
   "id": "AnotherSampleExtension",
-  "version": "0.0.0",
-  "publisher": "",
+  "version": "1.0.7",
+  "baseUri": "https://localhost:44300/",
+  "publisher": "WouterDeKortPlayground",
   "name": "Another Sample Extension",
   "description": "Create a folder in your source repositories from the web. No need to clone the repository or install extra tools.",
   "icons": {
-    "default": "images/VSO-Folder-196x.png"
+    "default": "static/images/VSO-Folder-196x.png"
   },
   "categories": [
     "Code"
@@ -24,7 +25,7 @@
       "path": "overview.md"
     },
     "license": {
-      "path": "marketplace/mp_terms.md"
+      "path": "mp_terms.md"
     }
   },
   "links": {
@@ -58,28 +59,34 @@
   ],
   "files": [
     {
-      "path": "main.html",
+      "path": "static/main.html",
       "addressable": true
     },
     {
-      "path": "dialog.html",
+      "path": "static/dialog.html",
       "addressable": true
     },
     {
-      "path": "scripts",
+      "path": "dist",
       "addressable": true
     },
     {
-      "path": "sdk",
+      "path": "static/images",
       "addressable": true
     },
     {
-      "path": "images",
+      "path": "static/css",
       "addressable": true
     },
     {
-      "path": "css",
-      "addressable": true
+      "path": "node_modules/vss-web-extension-sdk/lib",
+      "addressable": true,
+      "packagePath": "static/lib"
+    },
+    {
+      "path": "node_modules/applicationinsights-js/dist",
+      "addressable": true,
+      "packagePath": "static/lib"
     }
   ],
   "targets": [
@@ -97,9 +104,9 @@
       "properties": {
         "text": "Create a new folder",
         "title": "New Folder",
-        "icon": "images/VSO-Folder-16x.png",
+        "icon": "static/images/VSO-Folder-16x.png",
         "groupId": "editing",
-        "uri": "main.html"
+        "uri": "static/main.html"
       }
     },
     {
@@ -109,7 +116,7 @@
       ],
       "type": "ms.vss-web.control",
       "properties": {
-        "uri": "dialog.html"
+        "uri": "static/dialog.html"
       }
     }
   ]
