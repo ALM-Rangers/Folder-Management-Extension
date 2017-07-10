@@ -1,9 +1,8 @@
 {
   "manifestVersion": 1,
   "id": "AnotherSampleExtension",
-  "version": "1.0.8",
-  "baseUri": "https://localhost:44300/",
-  "publisher": "WouterDeKortPlayground",
+  "version": "0.0.0",
+  "publisher": "",
   "name": "Another Sample Extension",
   "description": "Create a folder in your source repositories from the web. No need to clone the repository or install extra tools.",
   "icons": {

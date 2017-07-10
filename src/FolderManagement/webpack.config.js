@@ -4,7 +4,8 @@ var webpack = require("webpack");
 module.exports = {
 	target: "web",
 	entry: {
-		app: "./src/main.ts"
+		app: "./src/main.ts",
+		dialog: "./src/dialog.ts",
 	},
 	output: {
 		filename: "[name].js",

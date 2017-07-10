@@ -13,10 +13,11 @@
 import Context = require("VSS/Context");
 import Dialog = require("./Dialog");
 import FolderManager = require("./FolderManager");
-// import TelemetryClient = require("./TelemetryClient");
 import RestClient = require("TFS/VersionControl/TfvcRestClient");
 import VCContracts = require("TFS/VersionControl/Contracts");
 import Q = require("q");
+import * as tc from "telemetryclient-team-services-extension";
+import telemetryClientSettings = require("./telemetryClientSettings");
 
 export class TFVCFolderManager extends FolderManager.FolderManager
 	implements FolderManager.IFolderManager {
@@ -39,7 +40,7 @@ export class TFVCFolderManager extends FolderManager.FolderManager
 
 		(tfvcClient as any).createChangeset(data).then(
 			() => {
-				// TelemetryClient.TelemetryClient.getClient().trackEvent("TFVC_Folder_Added");
+				tc.TelemetryClient.getClient(telemetryClientSettings.settings).trackEvent("TFVC_Folder_Added");
 				this.refreshBrowserWindow();
 			});
 	}

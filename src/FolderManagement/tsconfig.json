@@ -1,15 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es5",
     "module": "amd",
+    "moduleResolution": "node",
+    "target": "es5",
+    "rootDir": "src/",
+    "outDir": "dist/",
     "sourceMap": true,
-    "typeRoots": [
-      "./node_modules/@types"
-    ],
     "types": [
       "vss-web-extension-sdk"
-    ],
-    "outDir": "dist/"
+    ]
+
   },
   "exclude": [
     "node_modules"

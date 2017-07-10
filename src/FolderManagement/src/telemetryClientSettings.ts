@@ -4,6 +4,6 @@ export const settings: tc.TelemetryClientSettings = {
 	disableAjaxTracking: "false",
 	disableTelemetry: "false",
 	enableDebug: "false",
-	extensioncontext: "My Extension",
+	extensioncontext: "FolderManagement",
 	key: "__InstrumentationKey__",
 };

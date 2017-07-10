@@ -14,9 +14,10 @@
 import VCContracts = require("TFS/VersionControl/Contracts");
 import RestClient = require("TFS/VersionControl/GitRestClient");
 import Dialog = require("./Dialog");
-// import TelemetryClient = require("./TelemetryClient");
 import FolderManager = require("./FolderManager");
 import Q = require("q");
+import * as tc from "telemetryclient-team-services-extension";
+import telemetryClientSettings = require("./telemetryClientSettings");
 
 export class GitFolderManager extends FolderManager.FolderManager implements FolderManager.IFolderManager {
 
@@ -85,7 +86,7 @@ export class GitFolderManager extends FolderManager.FolderManager implements Fol
 
 				(gitClient as any).createPush(data, repositoryId, undefined).then(
 					() => {
-						// TelemetryClient.TelemetryClient.getClient().trackEvent("Git_Folder_Added");
+						tc.TelemetryClient.getClient(telemetryClientSettings.settings).trackEvent("Git_Folder_Added");
 						this.refreshBrowserWindow();
 					});
 			});
