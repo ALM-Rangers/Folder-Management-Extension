@@ -1,8 +1,8 @@
-﻿{
+{
   "apiKey": "cc23b7ca-dfcc-4651-968e-fdf963f318ab",
   "checkPolicies": true,
+  "devDep": false,
   "productName": "Extensions",
   "productVer": "$(Build.BuildNumber)",
-  "projectName": "$(Build.Repository.Name)",
-  "devDep": false
+  "projectName": "$(Build.Repository.Name)"
 }

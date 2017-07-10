@@ -1,0 +1,129 @@
+[
+    {
+        "dependencies": [
+            {
+                "version": "2.0.48",
+                "from": "@types/jquery@>=2.0.34-0 <3.0.0-0",
+                "artifactId": "https://registry.npmjs.org/@types/jquery/-/jquery-2.0.48.tgz",
+                "shasum": "3e90d8cde2d29015e5583017f7830cb3975b2eef",
+                "sha1": "3e90d8cde2d29015e5583017f7830cb3975b2eef",
+                "name": "@types/jquery",
+                "groupId": "@types/jquery",
+                "systemPath": null,
+                "scope": null,
+                "exclusions": [],
+                "classifier": null
+            },
+            {
+                "version": "0.0.32",
+                "from": "@types/q@0.0.32",
+                "artifactId": "https://registry.npmjs.org/@types/q/-/q-0.0.32.tgz",
+                "shasum": "bd284e57c84f1325da702babfc82a5328190c0c5",
+                "sha1": "bd284e57c84f1325da702babfc82a5328190c0c5",
+                "name": "@types/q",
+                "groupId": "@types/q",
+                "systemPath": null,
+                "scope": null,
+                "exclusions": [],
+                "classifier": null
+            },
+            {
+                "version": "1.0.9",
+                "from": "applicationinsights-js@>=1.0.9-0 <2.0.0-0",
+                "artifactId": "https://registry.npmjs.org/applicationinsights-js/-/applicationinsights-js-1.0.9.tgz",
+                "shasum": "228302639fa2021e856aebf0fa778186d5af3362",
+                "sha1": "228302639fa2021e856aebf0fa778186d5af3362",
+                "name": "applicationinsights-js",
+                "groupId": "applicationinsights-js",
+                "systemPath": null,
+                "scope": null,
+                "exclusions": [],
+                "classifier": null
+            },
+            {
+                "version": "0.0.21",
+                "from": "telemetryclient-team-services-extension@*",
+                "artifactId": "https://registry.npmjs.org/telemetryclient-team-services-extension/-/telemetryclient-team-services-extension-0.0.21.tgz",
+                "shasum": "8b5f6befa2dbf28a3921f64bcc7ce42aee7b9320",
+                "sha1": "8b5f6befa2dbf28a3921f64bcc7ce42aee7b9320",
+                "name": "telemetryclient-team-services-extension",
+                "groupId": "telemetryclient-team-services-extension",
+                "systemPath": null,
+                "scope": null,
+                "exclusions": [],
+                "classifier": null
+            },
+            {
+                "version": "2.117.0",
+                "from": "vss-web-extension-sdk@>=2.116.1-0 <3.0.0-0",
+                "artifactId": "https://registry.npmjs.org/vss-web-extension-sdk/-/vss-web-extension-sdk-2.117.0.tgz",
+                "children": [
+                    {
+                        "version": "1.11.34",
+                        "from": "@types/jqueryui@>=1.11.31-0 <2.0.0-0",
+                        "artifactId": "https://registry.npmjs.org/@types/jqueryui/-/jqueryui-1.11.34.tgz",
+                        "shasum": "0caff65df8f9ae930f87a53fa35093ab683d995d",
+                        "sha1": "0caff65df8f9ae930f87a53fa35093ab683d995d",
+                        "name": "@types/jqueryui",
+                        "groupId": "@types/jqueryui",
+                        "systemPath": null,
+                        "scope": null,
+                        "exclusions": [],
+                        "classifier": null
+                    },
+                    {
+                        "version": "3.4.41",
+                        "from": "@types/knockout@>=3.4.38-0 <4.0.0-0",
+                        "artifactId": "https://registry.npmjs.org/@types/knockout/-/knockout-3.4.41.tgz",
+                        "shasum": "f281a471d38f2f513c811d34832c819a0f265b18",
+                        "sha1": "f281a471d38f2f513c811d34832c819a0f265b18",
+                        "name": "@types/knockout",
+                        "groupId": "@types/knockout",
+                        "systemPath": null,
+                        "scope": null,
+                        "exclusions": [],
+                        "classifier": null
+                    },
+                    {
+                        "version": "0.14.57",
+                        "from": "@types/react@>=0.14.54-0 <0.15.0-0",
+                        "artifactId": "https://registry.npmjs.org/@types/react/-/react-0.14.57.tgz",
+                        "shasum": "1878a8654fafdd1d381b8457292b6433498c5b62",
+                        "sha1": "1878a8654fafdd1d381b8457292b6433498c5b62",
+                        "name": "@types/react",
+                        "groupId": "@types/react",
+                        "systemPath": null,
+                        "scope": null,
+                        "exclusions": [],
+                        "classifier": null
+                    },
+                    {
+                        "version": "2.1.29",
+                        "from": "@types/requirejs@>=2.1.28-0 <3.0.0-0",
+                        "artifactId": "https://registry.npmjs.org/@types/requirejs/-/requirejs-2.1.29.tgz",
+                        "shasum": "bc48bc833c079c2c24ba6afbca6d3a03b3f4e2f3",
+                        "sha1": "bc48bc833c079c2c24ba6afbca6d3a03b3f4e2f3",
+                        "name": "@types/requirejs",
+                        "groupId": "@types/requirejs",
+                        "systemPath": null,
+                        "scope": null,
+                        "exclusions": [],
+                        "classifier": null
+                    }
+                ],
+                "shasum": "f0cfdff4643f12ea607c2d67bf63671bac27bb47",
+                "sha1": "f0cfdff4643f12ea607c2d67bf63671bac27bb47",
+                "name": "vss-web-extension-sdk",
+                "groupId": "vss-web-extension-sdk",
+                "systemPath": null,
+                "scope": null,
+                "exclusions": [],
+                "classifier": null
+            }
+        ],
+        "coordinates": {
+            "artifactId": "$(Build.Repository.Name)",
+            "version": "1.0.0"
+        }
+    }
+]
