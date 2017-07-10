@@ -60,6 +60,7 @@
     <None Include="web.Release.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
+    <Content Include="whitesource.config.json" />
   </ItemGroup>
   <ItemGroup>
     <None Include="overview.md" />
