@@ -1,8 +1,8 @@
 {
-  "apiKey": "cc23b7ca-dfcc-4651-968e-fdf963f318ab",
+  "apiKey": "__WhiteSourceAPIKey__",
   "checkPolicies": true,
-  "devDep": false,
-  "productName": "Extensions",
-  "productVer": "$(Build.BuildNumber)",
-  "projectName": "$(Build.Repository.Name)"
+  "productName": "__ProductName__",
+  "productVer": "__ProductVersion__",
+  "projectName": "__ProjectName__",
+  "devDep": false
 }
