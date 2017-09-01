@@ -1,5 +1,5 @@
 > **NOTE** - We have deprecated support for Visual Studio Team Services (VSTS) and Team Foundation Server 2018, or higher. The *create new folder* feature is now part of the product for VSTS and TFS 2018, or higher. 
-> See XXXXXXX for details.
+> See [Deprecating our Folder Management extension](https://blogs.msdn.microsoft.com/visualstudioalmrangers/2017/08/31/deprecating-our-folder-management-extension/) for details.
 
 ## Create folders without cloning ##
 
