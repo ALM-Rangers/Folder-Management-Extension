@@ -91,7 +91,7 @@
   "targets": [
     {
       "id": "Microsoft.TeamFoundation.Server",
-      "version": "[14.3,15.0,15.1]"
+      "version": "[14.3,15.2]"
     }
   ],
   "contributions": [
