@@ -1,8 +1,11 @@
+> **NOTE** - We are deprecating support for Visual Studio Team Services (VSTS) and Team Foundation Server 2018, or higher. The *create new folder* feature is now part of the product for VSTS and TFS 2018, or higher. 
+> See [Deprecating our Folder Management extension](https://blogs.msdn.microsoft.com/visualstudioalmrangers/2017/08/31/deprecating-our-folder-management-extension/) for details.
+
 ## Create folders without cloning ##
 
 In Visual Studio Team Services you can add, edit, and delete files right from the web. However, if you need to add files or move existing files to a new folder, you must clone (or check out) the source repository locally, make the change, and commit it back to the server. With this extension you can now quickly create a folder right from the web. This is especially useful for non-developers used to working in the web.
 
-![Create a new folder](images/image1.png)
+![Create a new folder](static/images/image1.png)
 
 Works with both Git and Team Foundation Version Control source repositories.
 

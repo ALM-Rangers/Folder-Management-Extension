@@ -3,7 +3,7 @@
   "id": "AnotherSampleExtension",
   "version": "0.0.0",
   "publisher": "",
-  "name": "Another Sample Extension",
+  "name": "Another Great Sample Extension",
   "description": "Create a folder in your source repositories from the web. No need to clone the repository or install extra tools.",
   "icons": {
     "default": "static/images/VSO-Folder-196x.png"
@@ -90,7 +90,8 @@
   ],
   "targets": [
     {
-      "id": "Microsoft.VisualStudio.Services"
+      "id": "Microsoft.TeamFoundation.Server",
+      "version": "[14.3,15.2]"
     }
   ],
   "contributions": [
