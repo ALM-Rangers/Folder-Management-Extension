@@ -1,7 +1,11 @@
 {
   "ExpandedNodes": [
     "",
-    "\\src"
+    "\\src",
+    "\\src\\FolderManagement",
+    "\\src\\FolderManagement\\static",
+    "\\src\\FolderManagement\\static\\images"
   ],
+  "SelectedNode": "\\src\\FolderManagement\\vss-extension.json",
   "PreviewInSolutionExplorer": false
 }
