@@ -6,7 +6,7 @@
   "name": "Another Great Sample Extension",
   "description": "Create a folder in your source repositories from the web. No need to clone the repository or install extra tools.",
   "icons": {
-    "default": "static/images/VSO-Folder-128x.png"
+    "default": "static/images/VSO-Folder-196x.png"
   },
   "categories": [
     "Code"
