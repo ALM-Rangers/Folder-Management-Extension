@@ -3,9 +3,10 @@
     "",
     "\\src",
     "\\src\\FolderManagement",
+    "\\src\\FolderManagement\\src",
     "\\src\\FolderManagement\\static",
     "\\src\\FolderManagement\\static\\images"
   ],
-  "SelectedNode": "\\src\\FolderManagement\\vss-extension.json",
+  "SelectedNode": "\\src\\FolderManagement\\static\\images",
   "PreviewInSolutionExplorer": false
 }
