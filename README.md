@@ -1,4 +1,4 @@
-# Folder Management Extension
+# Folder-Management-Extension
 
 ![](https://almrangers.visualstudio.com/DefaultCollection/_apis/public/build/definitions/7f3cfb9a-d1cb-4e66-9d36-1af87b906fe9/97/badge)
 
@@ -34,6 +34,10 @@ Check out [Wouter de Kort's](http://blogs.msdn.com/b/willy-peter_schaub/archive/
     </td>
   </tr>
 </table>
+
+## Contributors
+
+We thank the following contributor(s) for this extension: Abel Wang and Wouter de Kort. 
 
 ## Contribute
 Contributions to Folder Management are welcome. Here is how you can contribute to Folder Management:  
