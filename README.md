@@ -2,6 +2,8 @@
 
 ![](https://almrangers.visualstudio.com/DefaultCollection/_apis/public/build/definitions/7f3cfb9a-d1cb-4e66-9d36-1af87b906fe9/97/badge)
 
+> **NOTICE** - We have deprecated this extension. For now it is still avaialble on the [Visual Studio Marketplace](https://marketplace.visualstudio.com). The extension will continue to serve as an open source solution and sample extension on GitHub.
+
 > ![Gears](Gears.png) Interested how our CI/CD pipeline works? Read [Set up a CI/CD pipeline for your Team Services extension](https://blogs.msdn.microsoft.com/visualstudioalmrangers/2017/04/17/set-up-a-cicd-pipeline-for-your-team-services-extension/) to learn more. 
 
 ## What
